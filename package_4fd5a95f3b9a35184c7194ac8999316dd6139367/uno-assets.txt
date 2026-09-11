@@ -697,6 +697,7 @@ _framework/PBt01.wasm
 _framework/QueryManager.wasm
 _framework/SmartMakerUno.DataContracts.wasm
 _framework/SPBds01.wasm
+_framework/StyleResourceDictionary.wasm
 _framework/TopApp.wasm
 _framework/TopDBManagerLibrary.wasm
 _framework/TopDefine.wasm
@@ -704,13 +705,13 @@ _framework/TopImport.wasm
 _framework/TopResource.wasm
 _framework/TopSmartResourceManager.wasm
 _framework/TopStructDataLibrary.wasm
-_framework/StyleResourceDictionary.wasm
 _framework/SmartMakerUno.DataContracts.pdb
 _framework/CodeBoxControl.pdb
 _framework/BOS041.pdb
 _framework/BOS04.pdb
 _framework/PBc01.pdb
 _framework/BOS08.pdb
+_framework/StyleResourceDictionary.pdb
 _framework/Bos006.pdb
 _framework/BOS09.pdb
 _framework/BOSd1.pdb
@@ -732,7 +733,6 @@ _framework/TopImport.pdb
 _framework/TopResource.pdb
 _framework/TopSmartResourceManager.pdb
 _framework/TopStructDataLibrary.pdb
-_framework/StyleResourceDictionary.pdb
 _framework/LiveChartsCore.SkiaSharpView.Uno.WinUI.dll
 _framework/Uno.Fonts.Fluent.dll
 _framework/Uno.Fonts.OpenSans.dll

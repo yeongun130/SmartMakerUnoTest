@@ -4,9 +4,9 @@
   "display": "standalone",
   "name": "SmartMakerUno",
   "short_name": "SmartMakerUno",
-  "start_url": "/SmartMakerUnoTest/index.html",
+  "start_url": "/index.html",
   "theme_color": "#ffffff",
-  "scope": "/SmartMakerUnoTest/",
+  "scope": "/",
   "icons": [
     {
       "src": "package_4fd5a95f3b9a35184c7194ac8999316dd6139367/icon-16.png",
