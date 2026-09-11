@@ -1,0 +1,223 @@
+<!--
+    Google Maps JavaScript API
+    **********************************************************
+    Google ID   : gunjoon.kim@gmail.com
+    Google PW   : 
+    ProjectName : mbizengine-namdo mapkey
+    API Key     : AIzaSyAfw_TBLOxQM1FurY_kfshZtoTz9bGp38s
+    **********************************************************
+-->
+
+<html> 
+    <head> 
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" /> 
+    <meta charset="utf-8">
+    <script type="text/javascript" src="https://maps.google.com/maps/api/js?key=#API_KEY&v=3&sensor=true"></script>
+    <script type="text/javascript">   
+
+        var markers;
+        var pathes;
+        var map;
+
+        function initialize() 
+        {     
+            markers = [];
+            pathes = [];
+            var latlng = new google.maps.LatLng(#위도, #경도);     
+            var myOptions = 
+            {       
+                zoom: #ZOOM,       
+                center: latlng,
+                mapTypeId: google.maps.MapTypeId.#MAPTYPE
+            };     
+            
+            map = new google.maps.Map(document.getElementById("map_canvas"), myOptions);   
+
+            //#MAKER
+            
+            //#PATH
+            
+            geocoder = new google.maps.Geocoder(); 
+            //#GEOCODER
+          
+            map.addListener("mousedown", function(e) {
+            	form_getClickPos(e.latLng.lat(),  e.latLng.lng());
+			});
+
+            map.addListener("mouseup", function(e) {
+                var position = map.getCenter();
+                // 2024.06.17 beh 스패로우 보안 검진 위해 주석 처리
+            	//console.log(position);
+            	form_getDragCenterPos(position.lat(), position.lng());
+			});
+        } 
+        
+        function setPath(geoPath, map)
+        {
+            var flightPath = new google.maps.Polyline({
+                path: geoPath,
+                strokeColor: "#0000FF",     
+                strokeOpacity: 1.0,     
+                strokeWeight: 2   
+            });    
+            
+            flightPath.setMap(map);
+        } 
+
+        function clearMarker()
+        {
+            var arrayLength = markers.length;
+
+            for(var i = 0; i < arrayLength; i++)
+            {
+                if(markers[i])
+                {
+                    markers[i].setMap(null);
+                }
+            }
+
+            markers = [];
+        }
+        
+        function addMarker(title, formPath, property, latitude, longitude, imgpath)
+        {
+            var position  = new google.maps.LatLng(latitude, longitude);
+
+            var marker = new google.maps.Marker(
+			{
+			    position: position,
+			    map: map
+			});
+
+            marker.setMap(map);    
+
+            google.maps.event.addListener(marker, 'click', function() 
+            {    
+                var eventTag = "linkDetailForm(" + "'" + encodeURIComponent(formPath) + "'" +  "," + "'" + property + "'" + ")";
+                //var titleTag = "linkDetailForm(" + "'" + position + "'" + "," + "'" + formPath + "'" +  "," + "'" + property + "'" + ")";
+                var contentString =
+				 '<div id="contentMap">'+
+					 '<br><div id=="adressMap">'+
+					 //'<input type="button" value="클릭" onclick="overlay.toggle();"></input>'+
+					 //'<a href="#" onClick="linkDetailForm(title)">상세폼연결</a> '+
+					 '<a href="#" onClick=' + eventTag + ";"+'>' + title +
+					 '</a>' +
+					 '<br></div>'+
+					 '<p>'
+                '</p>'+
+                '</div>';
+                
+                if(null != title && title.length != 0)
+                {
+                    var infowindow = new google.maps.InfoWindow({
+                        content: contentString,//title, 
+                        size: new google.maps.Size(100,100) 
+                    })
+                    infowindow.open(map, marker);
+                }
+    		                    
+                form_clickMaker(latitude, longitude, property);
+
+                return (marker);
+            }); 
+
+            markers.push(marker);
+        }
+
+        function placeMarker(position, map, title, formPath, property, latitude, longitude) 
+        {       
+            var marker = new google.maps.Marker(
+			{           
+			    position: position,           
+			    map: map
+			});         
+				
+            marker.setMap(map);    
+
+            google.maps.event.addListener(marker, 'click', function() 
+            {    
+                var eventTag = "linkDetailForm(" + "'" + encodeURIComponent(formPath) + "'" +  "," + "'" + property + "'" + ")";
+                //var titleTag = "linkDetailForm(" + "'" + position + "'" + "," + "'" + formPath + "'" +  "," + "'" + property + "'" + ")";
+                var contentString =
+				 '<div id="contentMap">'+
+					 '<br><div id=="adressMap">'+
+					 //'<input type="button" value="클릭" onclick="overlay.toggle();"></input>'+
+					 //'<a href="#" onClick="linkDetailForm(title)">상세폼연결</a> '+
+					 '<a href="#" onClick=' + eventTag + ";"+'>' + title +
+					 '</a>' +
+					 '<br></div>'+
+					 '<p>'
+                '</p>'+
+                '</div>';
+
+                if(null != title && title.length != 0 )
+                {
+                    var infowindow = new google.maps.InfoWindow({
+                        content: contentString,//title, 
+                        size: new google.maps.Size(100,100) 
+                    })
+                    infowindow.open(map, marker);
+                }
+                
+                form_clickMaker(latitude, longitude, property);
+
+                return (marker);
+            }); 
+        } 
+		
+        function form_getClickPos(latitude, longitude)
+        {
+        	mapCallForm.getClickPos(latitude, longitude);
+        }
+
+        function form_getDragCenterPos(latitude, longitude)
+        {
+        	mapCallForm.getDragCenterPos(latitude, longitude)
+        }
+
+        function linkDetailForm(filePath, property)
+        {
+            mapCallForm.callOpenForm(decodeURIComponent(filePath), property);
+        }
+
+        function form_clickMaker(latitude, longitude, property)
+        {
+            mapCallForm.clickMaker(latitude, longitude, property)
+        }
+
+        function centerMap(latitude, longtiude) {
+            map.setCenter(new google.maps.LatLng(latitude, longtiude));       
+        }
+
+        function codeAddress(address, map) 
+        {   
+            geocoder.geocode( { 'address': address}, function(results, status) {     
+                if (status == google.maps.GeocoderStatus.OK) {       
+                    map.setCenter(results[0].geometry.location);       
+                    var marker = new google.maps.Marker({           
+                        map: map,           
+                        position: results[0].geometry.location       
+                    }); 
+		            
+                    //google.maps.event.addListener(marker, 'click', function() { 
+                    var infowindow = new google.maps.InfoWindow({
+                        content: address, 
+                        size: new google.maps.Size(100,100) 
+                    })
+                    infowindow.open(map, marker);
+                    //});
+		                
+                } else {      
+                    alert('Geocode was not successful for the following reason: ' + status);
+                }   
+            }); 
+        } 
+    </script> 
+    </head> 
+    
+    <body onload="initialize()" style="margin:0x; overflow:hidden">   
+    
+    <div id="map_canvas" style="width:100%; height:100%"></div> 
+    
+    </body> 
+</html>

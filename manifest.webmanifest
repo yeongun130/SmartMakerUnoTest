@@ -1,0 +1,32 @@
+{
+  "background_color": "#ffffff",
+  "description": "SmartMakerUno",
+  "display": "standalone",
+  "name": "SmartMakerUno",
+  "short_name": "SmartMakerUno",
+  "start_url": "/SmartMakerUnoTest/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/SmartMakerUnoTest/",
+  "icons": [
+    {
+      "src": "package_4fd5a95f3b9a35184c7194ac8999316dd6139367/icon-16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "package_4fd5a95f3b9a35184c7194ac8999316dd6139367/icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "package_4fd5a95f3b9a35184c7194ac8999316dd6139367/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "package_4fd5a95f3b9a35184c7194ac8999316dd6139367/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
