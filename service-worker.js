@@ -1,4 +1,4 @@
-﻿import { config as unoConfig } from "/package_4fd5a95f3b9a35184c7194ac8999316dd6139367/uno-config.js";
+﻿import { config as unoConfig } from "/SmartMakerUnoTest/package_4fd5a95f3b9a35184c7194ac8999316dd6139367/uno-config.js";
 
 const MAX_CACHE_CONCURRENCY = 10;
 
@@ -72,7 +72,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
     self.addEventListener('install', function (e) {
         console.debug('[ServiceWorker] Installing offline worker');
         e.waitUntil(
-            caches.open('234f7a51-d3b4-4a45-a089-02c4cf927e06').then(async function (cache) {
+            caches.open('59e25e51-5567-4e68-a267-6a2d195401bd').then(async function (cache) {
                 console.debug('[ServiceWorker] Caching app binaries and content');
 
                 await cacheFilesWithConcurrency(cache, unoConfig.offline_files, MAX_CACHE_CONCURRENCY);
@@ -84,7 +84,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
                     // Replace dynamic import with fetch and eval for web worker compatibility
                     // In .NET 10+, dotnet.boot.js was merged with dotnet.js for performance
                     // Use the fingerprinted filename from config for proper caching
-                    const response = await fetch(`/_framework/${unoConfig.dotnet_js_filename}`);
+                    const response = await fetch(`/SmartMakerUnoTest/_framework/${unoConfig.dotnet_js_filename}`);
                     if (!response.ok) {
                         throw new Error(`Failed to fetch ${unoConfig.dotnet_js_filename}: ${response.status} ${response.statusText}`);
                     }
@@ -131,7 +131,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
                         monoConfigResources.wasmNative,
                         monoConfigResources.icu
                     ].flatMap(extractFilenames).map(
-                        filename => `/_framework/${filename}`
+                        filename => `/SmartMakerUnoTest/_framework/${filename}`
                     );
                     await cacheFilesWithConcurrency(cache, frameworkUris, MAX_CACHE_CONCURRENCY);
                 } catch (e) {
@@ -150,7 +150,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
             caches.keys().then(function (cacheNames) {
                 return Promise.all(
                     cacheNames.filter(function (cacheName) {
-                        return cacheName !== '234f7a51-d3b4-4a45-a089-02c4cf927e06';
+                        return cacheName !== '59e25e51-5567-4e68-a267-6a2d195401bd';
                     }).map(function (cacheName) {
                         console.debug('[ServiceWorker] Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
