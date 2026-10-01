@@ -721,6 +721,7 @@ _framework/SmartMaker.wasm
 _framework/SmartMakerUno.DataContracts.wasm
 _framework/SPBds01.wasm
 _framework/SPBp03.wasm
+_framework/SPBw04.wasm
 _framework/StyleResourceDictionary.wasm
 _framework/TopAIAdaptorLibrary.wasm
 _framework/TopAIAdaptorManager.wasm
@@ -745,6 +746,7 @@ _framework/BOS08.pdb
 _framework/TopDBManager80.pdb
 _framework/StyleResourceDictionary.pdb
 _framework/SmartMaker.pdb
+_framework/SPBw04.pdb
 _framework/LocalDataStore.pdb
 _framework/ActionManager.pdb
 _framework/AnimationLib.pdb
@@ -950,6 +952,9 @@ CodeBoxControl/Assets/monaco/vs/wgsl-BhLXMOR0.js
 CodeBoxControl/Assets/monaco/vs/workers-BBttULjf.js
 CodeBoxControl/Assets/monaco/vs/xml-cZjNDqDT.js
 CodeBoxControl/Assets/monaco/vs/yaml-A1fOIdH6.js
+Common/BOS/ko-KR/ProcessQ80.resources.dll
+Common/BOS/en-US/ProcessQ80.resources.dll
+Common/BOS/ja-JP/ProcessQ80.resources.dll
 Common/Global/80/Resource/mBizOfficeIcon.png
 Common/Global/80/Resource/SmartMakerIcon.png
 Common/Global/skin.bmp
@@ -1488,6 +1493,14 @@ BOS04/Resources/PaintTool/images/logo.svg
 BOS04/Components/Kakao/KakaoButton_check.png
 BOS04/Components/Kakao/KakaoButton_UnCheck.png
 BOS04/Components/Kakao/KakaoDefulatImage.jpg
+BOS04/Resources/ResizeWindow/윈도우상단_닫기.png
+BOS04/Resources/ResizeWindow/윈도우상단_닫기off.png
+BOS04/Resources/ResizeWindow/윈도우상단_이전크기.png
+BOS04/Resources/ResizeWindow/윈도우상단_이전크기off.png
+BOS04/Resources/ResizeWindow/윈도우상단_최대화.png
+BOS04/Resources/ResizeWindow/윈도우상단_최대화off.png
+BOS04/Resources/ResizeWindow/윈도우상단_최소화.png
+BOS04/Resources/ResizeWindow/윈도우상단_최소화off.png
 BOS04/Components/Chatting/Resource/icon_addsender.png
 BOS04/Components/Chatting/Resource/icon_back.png
 BOS04/Components/Chatting/Resource/icon_person.png
@@ -1536,14 +1549,6 @@ BOS04/Resources/ResizeWindow/SmartMaker_윈도우상단_닫기.png
 BOS04/Resources/ResizeWindow/SmartMaker_윈도우상단_이전크기.png
 BOS04/Resources/ResizeWindow/SmartMaker_윈도우상단_최대화.png
 BOS04/Resources/ResizeWindow/SmartMaker_윈도우상단_최소화.png
-BOS04/Resources/ResizeWindow/윈도우상단_닫기.png
-BOS04/Resources/ResizeWindow/윈도우상단_닫기off.png
-BOS04/Resources/ResizeWindow/윈도우상단_이전크기.png
-BOS04/Resources/ResizeWindow/윈도우상단_이전크기off.png
-BOS04/Resources/ResizeWindow/윈도우상단_최대화.png
-BOS04/Resources/ResizeWindow/윈도우상단_최대화off.png
-BOS04/Resources/ResizeWindow/윈도우상단_최소화.png
-BOS04/Resources/ResizeWindow/윈도우상단_최소화off.png
 BOS04/Resources/ResizeWindow/폰상단.png
 BOS04/Resources/TextSetting.png
 BOS04/Resources/ToolBar/Delete.png
@@ -2642,3 +2647,7 @@ SPBp03/SubControls/Masking/MediaStop.png
 SPBp03/SubControls/Masking/MediaSync.png
 SPBp03/SubControls/Masking/MediaTextSync.png
 SPBp03/SubControls/EBookImage/DefaultImage2.png
+SPBw04/Resource/MenuRootItem.png
+SPBw04/Resource/MenuRootItemOpened.png
+SPBw04/Resource/MenuSubItem.png
+SPBw04/Resource/MenuSubItemOpened.png
