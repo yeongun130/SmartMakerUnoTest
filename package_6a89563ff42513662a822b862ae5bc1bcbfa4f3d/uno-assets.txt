@@ -721,6 +721,7 @@ _framework/SmartMaker.wasm
 _framework/SmartMakerUno.DataContracts.wasm
 _framework/SPBds01.wasm
 _framework/SPBp03.wasm
+_framework/SPBp04.wasm
 _framework/SPBw04.wasm
 _framework/StyleResourceDictionary.wasm
 _framework/TopAIAdaptorLibrary.wasm
@@ -778,6 +779,7 @@ _framework/QueryManager.pdb
 _framework/SBOS08.pdb
 _framework/SPBds01.pdb
 _framework/SPBp03.pdb
+_framework/SPBp04.pdb
 _framework/TopAIAdaptorLibrary.pdb
 _framework/TopAIAdaptorManager.pdb
 _framework/TopAnimation.pdb
@@ -2450,6 +2452,8 @@ TopBuild/Resources/PhoneSkin_RightCenter.png
 TopBuild/Resources/PhoneSkin_RightTop.png
 TopBuild/Resources/Create.png
 TopBuild/Resources/Delete.png
+TopBuild/Resources/icon_축소.png
+TopBuild/Resources/icon_확대.png
 TopBuild/Resources/MakerStoreCheck.png
 TopBuild/Resources/MakerStoreEng/AutoPauseOFF.png
 TopBuild/Resources/MakerStoreEng/AutoPauseON.png
@@ -2531,8 +2535,6 @@ TopBuild/Resources/SmartMakerLogo_Bottom.png
 TopBuild/Resources/SmartMakerLogo_Top.png
 TopBuild/Resources/사이즈조절.png
 TopBuild/Views/StatusBar/Components/Resource/information-icon.png
-TopBuild/Resources/icon_축소.gif
-TopBuild/Resources/icon_확대.gif
 PBs03_80/Assets/SourceTextBox/Close.png
 PBs03_80/Assets/SourceTextBox/DownArrow.png
 PBs03_80/Assets/SourceTextBox/Object.png
