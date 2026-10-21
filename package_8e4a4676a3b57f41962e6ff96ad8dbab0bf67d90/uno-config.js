@@ -1,7 +1,7 @@
 let config = {};
 config.uno_remote_managedpath = "_framework";
 config.uno_app_base = "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90";
-config.dotnet_js_filename = "dotnet.5rjjln7zr9.js";
+config.dotnet_js_filename = "dotnet.0k9kfty3gx.js";
 config.uno_dependencies = ["/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/helpers.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/Uno.Runtime.Wasm.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/setImmediate.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/Uno.Wasm.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/TaskNotification.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/MapView.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/PGliteInterop.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/ScreenInfoInterop.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/FileDownloadInterop.js", "/SmartMakerUnoTest/package_8e4a4676a3b57f41962e6ff96ad8dbab0bf67d90/AppManifest.js"];
 config.uno_runtime_options = [];
 config.enable_pwa = true;
