@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  #preview { width: 100%; height: 100%; object-fit: contain; background: #000; }
+</style>
+</head>
+<body>
+<video id="preview" autoplay playsinline muted></video>
+<script>
+  function postWebViewMessage(message) {
+    try {
+      if (window.hasOwnProperty("chrome") && typeof chrome.webview !== "undefined") {
+        chrome.webview.postMessage(message);
+      } else if (window.hasOwnProperty("unoWebView")) {
+        unoWebView.postMessage(JSON.stringify(message));
+      } else if (window.hasOwnProperty("webkit") && typeof webkit.messageHandlers !== "undefined") {
+        webkit.messageHandlers.unoWebView.postMessage(JSON.stringify(message));
+      }
+    } catch (ex) {
+      /* postMessage 브릿지가 없는 환경(WASM iframe 등)에서는 조용히 무시 - window.captureSnapshotBase64()의
+         반환값(ExecuteScriptAsync)만으로도 캡처 기능은 동작한다. */
+    }
+  }
+
+  var currentStream = null;
+
+  async function startCamera() {
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      var video = document.getElementById("preview");
+      video.srcObject = currentStream;
+      postWebViewMessage({ type: "ready" });
+    } catch (ex) {
+      postWebViewMessage({ type: "error", message: String(ex) });
+    }
+  }
+
+  function stopCamera() {
+    if (currentStream) {
+      currentStream.getTracks().forEach(function (track) { track.stop(); });
+      currentStream = null;
+    }
+  }
+
+  function captureSnapshotBase64() {
+    var video = document.getElementById("preview");
+    if (!video.videoWidth || !video.videoHeight) {
+      return "";
+    }
+    var canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }
+
+  window.captureSnapshotBase64 = captureSnapshotBase64;
+  window.stopCamera = stopCamera;
+
+  startCamera();
+</script>
+</body>
+</html>

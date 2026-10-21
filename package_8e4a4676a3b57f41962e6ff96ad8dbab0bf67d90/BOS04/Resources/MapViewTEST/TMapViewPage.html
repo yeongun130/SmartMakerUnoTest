@@ -1,0 +1,137 @@
+﻿<!--
+    TMap JavaScript API
+    **********************************************************
+    ID   :
+    PW   :
+    ProjectName : 
+    API Key     : 
+    Sample      : https://tmapapi.sktelecom.com/main.html
+    **********************************************************
+-->
+
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+
+<title>simpleMap</title>
+<script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=#API_KEY"></script>
+
+<script>
+    var map;
+    function initialize() 
+    { 
+        var mapOptions = {
+            center: new Tmapv2.LatLng(#위도, #경도),
+            zoom: #ZOOM
+        };
+
+        map = new Tmapv2.Map(document.getElementById("map_canvas"), mapOptions);
+
+        //#MAKER
+            
+        //#PATH
+
+        //geocoder = new Tmapv2.Geocoder(); 
+        //#GEOCODER
+
+        map.addListener("mousedown", onTouchstart); 
+        map.addListener("mouseup", onTouchend);
+    }
+
+    function placeMarker(position, map, title, formPath, property, latitude, longitude, imgpath)
+    {       
+        var marker = new Tmapv2.Marker(
+        {           
+            position: position,
+            icon: imgpath
+        });   
+        
+        marker.setMap(map); 
+		
+        marker.addListener('click', function(e) 
+        {
+            //marker.setPosition(e.coord);
+
+            var eventTag = "linkDetailForm(" + "'" + formPath + "'" +  "," + "'" + property + "'" + ")";
+            var contentString =
+             '<div id="contentMap">'+
+                 '<br><div id=="adressMap">'+
+                 //'<input type="button" value="클릭" onclick="overlay.toggle();"></input>'+
+                 //'<a href="#" onClick="linkDetailForm(title)">상세폼연결</a> '+
+                 '<a href="#" onClick=' + eventTag + ";"+'>' + title +
+                 '</a>' +
+                 '<br></div>'+
+                 '<p>'
+            '</p>'+
+            '</div>';
+
+            if(null != title && title.length != 0 )
+            {
+                var infowindow = new Tmapv2.InfoWindow({
+                    position: position,
+                    content: contentString,
+                    map: map
+                })
+            }
+            //infowindow.open(map, marker);
+    		                    
+            clickMaker(latitude, longitude, property);
+
+            return (marker);
+
+        });
+    }
+
+    function onTouchstart(e) {
+    	var lonlat =e.latLng;
+    	mapCallForm.getClickPos(lonlat.latitude(), lonlat.longitude());
+    }
+
+    function onTouchend(e) {
+    	var lonlat = map.getCenter();
+    	mapCallForm.getDragCenterPos(lonlat.latitude(), lonlat.longitude())
+    }
+
+     function linkDetailForm(filePath, property)
+     {
+           mapCallForm.openQPMFile(filePath, property);
+     }
+
+    function clickMaker(latitude, longitude, property)
+    {
+        mapCallForm.clickMaker(latitude, longitude, property);
+    }
+
+    function codeAddress(address, map) 
+    {   
+        geocoder.geocode( { 'address': address}, function(results, status) 
+        {     
+            if (status == Tmapv2.GeocoderStatus.OK) 
+            {       
+                map.setCenter(results[0].geometry.location);       
+                var marker = new Tmapv2.Marker({           
+                    map: map,           
+                    position: results[0].geometry.location       
+                }); 
+		            
+                var infowindow = new Tmapv2.InfoWindow({
+                    content: address, 
+                    size: new google.maps.Size(100,100) 
+                })
+                infowindow.open(map, marker);
+            } 
+            else 
+            {      
+                alert('Geocode was not successful for the following reason: ' + status);
+            }   
+        }); 
+    } 
+    </script>
+    </head>
+
+    <body onload="initialize()" style="margin:0x; overflow:hidden">   
+        <div id="map_canvas" style="width:100%; height:100%"></div> 
+    </body>
+</html>
