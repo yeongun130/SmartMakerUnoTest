@@ -72,7 +72,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
     self.addEventListener('install', function (e) {
         console.debug('[ServiceWorker] Installing offline worker');
         e.waitUntil(
-            caches.open('8af582e1-1dcf-4c4a-9763-4f9443087b43').then(async function (cache) {
+            caches.open('4167154d-cf0d-4aa4-8605-f7e86139a9ea').then(async function (cache) {
                 console.debug('[ServiceWorker] Caching app binaries and content');
 
                 await cacheFilesWithConcurrency(cache, unoConfig.offline_files, MAX_CACHE_CONCURRENCY);
@@ -150,7 +150,7 @@ if (unoConfig.environmentVariables["UNO_BOOTSTRAP_DEBUGGER_ENABLED"] !== "True")
             caches.keys().then(function (cacheNames) {
                 return Promise.all(
                     cacheNames.filter(function (cacheName) {
-                        return cacheName !== '8af582e1-1dcf-4c4a-9763-4f9443087b43';
+                        return cacheName !== '4167154d-cf0d-4aa4-8605-f7e86139a9ea';
                     }).map(function (cacheName) {
                         console.debug('[ServiceWorker] Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
