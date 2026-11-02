@@ -1,0 +1,3406 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="verbdic.xsl" ?>
+<!--
+// 자연어로 작성한 스크립트를 기호식 스크립트로 변환하는 것 지원 예정
+//사전은 별도로 Serialize 시켜서 구동시에 사전정보 생성에 드는 시간을 절약하자..
+//인덱스화시켜도 무방한 함수 또는 속성들에 대해서는 인덱스화 시켜서 저장하므로써 
+//컴파일 시간을 절약한다.
+//
+//사전파일을 생성할 때, 구조의 길이가 가장 긴것을 먼저 넣고, 다음은 조건이 있는 것을 먼저 넣는다.
+
+1. 조사의 종류
+ 은/는 : S   (주격조사 Subject) 
+ 이/가 : H   (보격조사 Help)
+ 을/를 : O   (목적격조사 Object)
+ 이라는/라는 : D (지칭조사 Designate)
+ 의 : B  (by)
+ 에 : N  (on)
+ 에서 : I (IN)
+ 로/으로 : W (with)
+ 보다 : T (than)
+ 서술어  : V (Verb)
+ 가짜서술어 : X  - 동사형태지만 서술어역활을 하지 않는 동사
+ 파라메터문장 : P (Parameter)
+ 조건문장 : C  (Condition)
+ 이벤트 : F (Function Event)
+ 커서   : R (CURSOR)  -> 프로시저에서 사용
+ 문장 : A  
+ 그외 : E (etc)
+ 
+//CPatternAnal.COMPONENT 및 COMP_TYPE 과 연결, 
+//A, B, C, D, E, F, H, I, K, N, O, P, R, S, T, V, W, X
+
+2. XML 요소의 구성
+	 <ID>				: 패턴 고유번호 - 서술어별로 매겨지며 불변이다. 이 고유번호는 팝업메뉴의 우선순위 설정에 사용된다.
+	 <GR_TYPE>	: 문장의 종류를 판단한다. 대입문인지.. 함수인지.. 반복문인지 등등..
+   <CHAR>			: 문장의 패턴을 나타낸다. 문장성분의 조합, 주어+목적어+서술어 = S + O + V
+	 <RUN>			: 기호식 스크립트의 문법을 나타낸다. 사전정보를 만들 때 참고하므로 함부로 바꾸면 안 된다
+	 <COND>			: 조건 및 문장에 꼭 필요한 예약어이다 문장성분의 위치와 일치해야 한다.
+	 <EXAMPLE>	: 자연어 스크립트 예문이다.
+	 <HELP_EX>	: 파라메터에 대한 명칭이 붙어있는 예문이다. 추후 기능개선이 필요할 듯 하여 Example과 분리한 상태, Dic에는 HELP_EX우선 저장된다.
+	 <SHOW>			: FALSE이면 PopupHelp에 보이지 않는다, 지향하지 않는 문법, 여러가지 중복되는 문법 등을 사용자에게 보이지 않기 위해
+	 <RESULT>		: 함수가 실행한 후 반환값 (현재 사용 안함) 
+	 <KEYWORD>	: 편집기에서 F1을 눌렀을 때 Html Help에서 검색할 검색어
+
+3. XML 요소의 해석
+		<Patterns>
+			<ID>1</ID>											-> '표시하다' 에서 ID 1
+			<GR_TYPE>EXPR</GR_TYPE>         ->  문장종류 : 연산식
+			<CHAR>O + N + V</CHAR>          ->  문장성분 : 목적어+...에+서술어 
+			<RUN>메시지(OP, VP)</RUN>       ->  기호식으로 변경했을 때의 문법
+			<COND>문장, 화면</COND>         ->  목적어의 체언은 '문장', '...에'의 체언은 화면
+			<EXAMPLE>문장(...)를 화면에 표시한다('예아니오', '질문').</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+
+4. 문장성분의 해석
+ OP, A1P 처럼 알파벳 또는 숫자 조합의 해석 
+ 첫번째 문자 : 문장성분의 종류
+ 두번째 숫자 : 예약어에서 몇번째 문장성분이냐.. (Zero base)
+ 두번째 또는 세번째 문자 : 첫번째 문장 성분의 파라메터 (예를 들어 "검색창(1,2)의 항목크기"에서 (1,2)의 정보가 된다
+ 
+5. 기타
+[OBJECT] : 아톰만 들어가는 곳, 아톰에 제한적인 실행문을 필터링하기 위해
+
+-->
+<VerbDic>
+	<Verb>
+		<VERBID>-であ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + V</CHAR>
+			<RUN>H = V</RUN>
+			<COND />
+			<EXAMPLE>...が...であれば</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>,,以上</COND>
+			<EXAMPLE>...が...以上であれば</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>,,以下</COND>
+			<EXAMPLE>...が...以下であれば</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt; E</RUN>
+			<COND>,,未満</COND>
+			<EXAMPLE>...が...未満であれば</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &gt; E</RUN>
+			<COND>,,超過</COND>
+			<EXAMPLE>...が...超過であれば</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V + E</CHAR>
+			<RUN>V</RUN>
+			<COND>条件,場合</COND>
+			<EXAMPLE>条件(...)である場合</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V</CHAR>
+			<RUN>V</RUN>
+			<COND>条件</COND>
+			<EXAMPLE>条件(...)であれば</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + V</CHAR>
+			<RUN>S = V</RUN>
+			<COND />
+			<EXAMPLE>...は...である</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>参照</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + O + V</CHAR>
+			<RUN>S = O</RUN>
+			<COND />
+			<EXAMPLE>...は...を参照する</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S = O</RUN>
+			<COND>,,全て </COND>
+			<EXAMPLE>...は...を全て参照する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + A + V</CHAR>
+			<RUN>S = A</RUN>
+			<COND />
+			<EXAMPLE>...は(.値を整数に変更して) 参照する</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>PARAM</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND />
+			<EXAMPLE>...を参照して</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + B + O + E + V</CHAR>
+			<RUN>S = B(繰り返し回数, O)</RUN>
+			<COND>,,,順番に</COND>
+			<EXAMPLE>...は...の...を順番に参照する</EXAMPLE>
+			<HELP_EX>...は@配列の@列名を順番に参照する</HELP_EX>
+			<KEYWORD>順番に</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S = O(繰り返し回数)</RUN>
+			<COND>,,順番に</COND>
+			<EXAMPLE>...は...を順番に参照する</EXAMPLE>
+			<HELP_EX>...は@配列を順番に参照する</HELP_EX>
+			<KEYWORD>順番に</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S.追加代入(O)</RUN>
+			<COND>,,さらに</COND>
+			<EXAMPLE>...は...をさらに参照する。</EXAMPLE>
+			<HELP_EX>...は@配列をさらに参照する。</HELP_EX>
+			<KEYWORD>追加代入</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + B + O + V</CHAR>
+			<RUN>S = 接続情報(B, OP)</RUN>
+			<COND>,,接続情報</COND>
+			<EXAMPLE>...は...の接続情報(...)を参照する。</EXAMPLE>
+			<HELP_EX>...は@部門名の接続情報(@区分定数)を参照する。</HELP_EX>
+			<KEYWORD>接続情報</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + E + O + V</CHAR>
+			<RUN>S = E</RUN>
+			<COND>,,可否</COND>
+			<EXAMPLE>...は@属性可否を参照する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + E + O + V</CHAR>
+			<RUN>S = E</RUN>
+			<COND>,,フォームを参照する。</COND>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + B + O + V</CHAR>
+			<RUN>S = アトム変数(BP, O)</RUN>
+			<COND>,アトム変数</COND>
+			<EXAMPLE>...はアトム変数(@アトム名)の@属性を参照する。</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + S + O + V</CHAR>
+			<RUN>アトム変数(BP, S, O)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の...は...を参照する。</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>代入</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N = O</RUN>
+			<COND />
+			<EXAMPLE>...に ...を代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N = O</RUN>
+			<COND>,,全て</COND>
+			<EXAMPLE>...に...を全て代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + A + V</CHAR>
+			<RUN>N = A</RUN>
+			<COND />
+			<EXAMPLE>...に(管理番号を変更して)代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>N + B + O + E + V</CHAR>
+			<RUN>N = B(繰り返し回数, O)</RUN>
+			<COND>,,,順番に</COND>
+			<EXAMPLE>...に...の...を順番に代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>順番に</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N = O(繰り返し回数)</RUN>
+			<COND>,,順番に</COND>
+			<EXAMPLE>...に ...を順番に代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>順番に</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N.追加代入(O)</RUN>
+			<COND>,,さらに</COND>
+			<EXAMPLE>[OBJECT]に ...をさらに代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>追加代入</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + E + O + V</CHAR>
+			<RUN>N = E</RUN>
+			<COND>,,可否</COND>
+			<EXAMPLE>...に...可否を代入する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>N + B + O + V</CHAR>
+			<RUN>N = アトム変数(BP, O)</RUN>
+			<COND>,アトム変数</COND>
+			<EXAMPLE>...にアトム変数(@アトム名)の@属性を代入する。</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>アトム変数(BP, N, O)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の...に...を代入する。</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>設定</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + N + V</CHAR>
+			<RUN>S = N</RUN>
+			<COND />
+			<EXAMPLE>...は...に設定する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O = N</RUN>
+			<COND />
+			<EXAMPLE>...を...に設定する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 真</RUN>
+			<COND />
+			<EXAMPLE>...を設定する。</EXAMPLE>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 真</RUN>
+			<COND>, 属性</COND>
+			<EXAMPLE>... 属性を設定する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O.進行準備</RUN>
+			<COND>,最初状態</COND>
+			<EXAMPLE>[OBJECT]を最初状態に設定する。</EXAMPLE>
+			<KEYWORD>進行準備</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>ファイル指定(OP)</RUN>
+			<COND>ファイル</COND>
+			<EXAMPLE>ファイル(...)を設定する。</EXAMPLE>
+			<HELP_EX>ファイル(@区分定数, @拡張子リスト, @基本拡張子)を設定する。</HELP_EX>
+			<RESULT>選択されたファイル</RESULT>
+			<KEYWORD>ファイル指定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム.時間イベント('設定', OP)</RUN>
+			<COND>フォーム,時間イベント,</COND>
+			<EXAMPLE>フォームの時間イベント(...)を設定する。</EXAMPLE>
+			<HELP_EX>フォームの時間イベント(@イベント番号, @実行間隔)を設定する。</HELP_EX>
+			<KEYWORD>時間イベント設定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>B.ユーザーメッセージ(真, N)</RUN>
+			<COND>,案内文章,</COND>
+			<EXAMPLE>[OBJECT]の 案内文章を....に設定する。</EXAMPLE>
+			<KEYWORD>ユーザーメッセージ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム.開始位置(OP)</RUN>
+			<COND>フォーム, 開始位置</COND>
+			<EXAMPLE>フォームの開始位置(..., ...)を 設定する。</EXAMPLE>
+			<HELP_EX>フォームの開始位置(@X座標, @Y座標)を設定する。</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム.サイズ変更(OP)</RUN>
+			<COND>フォーム, サイズ</COND>
+			<EXAMPLE>フォームのサイズ(.., ...)を設定する。</EXAMPLE>
+			<HELP_EX>フォームのサイズ(@横, @縦)を設定する。</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>フォーム.ページ設定(N)</RUN>
+			<COND>フォーム, ページ,</COND>
+			<EXAMPLE>フォームのページを...に設定する。</EXAMPLE>
+			<KEYWORD>ページ設定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.ナビゲーションバー('設定')</RUN>
+			<COND>フォーム,ナビゲーションバー</COND>
+			<EXAMPLE>フォームのナビゲーションバーを設定する。</EXAMPLE>
+			<KEYWORD>ナビゲーションバー設定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>アトム変数(BP, O, 真)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の...を設定する.</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>アトム変数(BP, O, N)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の ...を ...に設定する</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>アラーム機能('設定', OP)</RUN>
+			<COND>機能</COND>
+			<EXAMPLE>アラーム機能を設定する</EXAMPLE>
+			<KEYWORD>アラーム機能</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォルダー権限(OP)</RUN>
+			<COND>フォルダー権限</COND>
+			<EXAMPLE>フォルダー権限(...)を設定する</EXAMPLE>
+			<KEYWORD>フォルダー権限</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>進行</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + E + V</CHAR>
+			<RUN>O.進行</RUN>
+			<COND>,設定, 間隔</COND>
+			<EXAMPLE>[OBJECT]を設定間隔だけ進行する</EXAMPLE>
+			<KEYWORD>進行表示欄進行</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>定義</VERBID>
+	</Verb>
+	<Verb>
+		<VERBID>実行</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>オブジェクト作成('フォーム', BP, OP)</RUN>
+			<COND>パス, フォーム</COND>
+			<EXAMPLE>パス(...)のフォームを実行する。</EXAMPLE>
+			<KEYWORD>子フォーム実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + E + V</CHAR>
+			<RUN>オブジェクト作成('フォーム', BP, '優先実行', OP)</RUN>
+			<COND>パス, フォーム, 優先</COND>
+			<EXAMPLE>パス(...)のフォームを優先実行する。</EXAMPLE>
+			<KEYWORD>子フォーム実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + E + V</CHAR>
+			<RUN>オブジェクト作成('フォーム', BP, '隠す', OP)</RUN>
+			<COND>パス, フォーム, 隠し</COND>
+			<EXAMPLE>パス(...)のフォームを隠し実行する。</EXAMPLE>
+			<KEYWORD>子フォーム実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>オブジェクト作成('ビジネス言語定義', BP, OP)</RUN>
+			<COND>パス, 業務ルール</COND>
+			<EXAMPLE>パス(...)の業務ルールを実行する</EXAMPLE>
+			<KEYWORD>業務ルール実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>DB処理文実行 (OP, 照会結果)</RUN>
+			<COND>DB処理文</COND>
+			<EXAMPLE>DB処理文(...)を実行する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>DB処理文</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>DB処理文実行(N.OP, 照会結果)</RUN>
+			<COND>,DB処理文</COND>
+			<EXAMPLE>[OBJECT]にDB処理文(...)を実行する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>DB処理文</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.OP ()</RUN>
+			<COND>,段落</COND>
+			<EXAMPLE>...の段落(...)を実行する。</EXAMPLE>
+			<HELP_EX>@フォームの段落(...)を実行する。</HELP_EX>
+			<RESULT>実行結果</RESULT>
+			<KEYWORD>段落実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>OP ()</RUN>
+			<COND>段落</COND>
+			<EXAMPLE>段落(...)を実行する。</EXAMPLE>
+			<RESULT>実行結果</RESULT>
+			<KEYWORD>段落実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O ()</RUN>
+			<COND />
+			<EXAMPLE>...を実行する。</EXAMPLE>
+			<HELP_EX>@関数を実行する。</HELP_EX>
+			<RESULT>実行結果</RESULT>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.優先実行</RUN>
+			<COND />
+			<EXAMPLE>...を優先実行する。</EXAMPLE>
+			<HELP_EX>@子フォームを優先実行する。</HELP_EX>
+			<KEYWORD>優先実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + O + V</CHAR>
+			<RUN>OP(P)</RUN>
+			<COND>,段落</COND>
+			<EXAMPLE>(引数1, 引数2を 参照して)段落(...)を実行する。</EXAMPLE>
+			<RESULT>実行結果</RESULT>
+			<KEYWORD>段落実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + O + V</CHAR>
+			<RUN>O(P)</RUN>
+			<COND />
+			<EXAMPLE>(@引数1, @引数2を 参照して)...を実行する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<RESULT>実行結果</RESULT>
+			<KEYWORD>段落実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + B + O + V</CHAR>
+			<RUN>B.OP(P)</RUN>
+			<COND>,,段落</COND>
+			<EXAMPLE>(@引数1, @引数2を 参照して) ...の段落(...)を実行する。</EXAMPLE>
+			<HELP_EX>(@引数1, @引数2を 参照して) @フォームの段落(...)を実行する。</HELP_EX>
+			<RESULT>実行結果</RESULT>
+			<KEYWORD>段落実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>C + E + O + E + V</CHAR>
+			<RUN>繰り返し (C) \n O</RUN>
+			<COND>,次の, 段落,繰り返し</COND>
+			<EXAMPLE>(条件と)次の段落を繰り返し実行する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>E + O + E + E + V</CHAR>
+			<RUN>繰り返し (E1) \n O</RUN>
+			<COND>次の,段落,,繰り返し</COND>
+			<EXAMPLE>次の段落を...回繰り返し実行する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>ELSEIF</GR_TYPE>
+			<CHAR>C + E + O + V</CHAR>
+			<RUN>またもし (C) \n E</RUN>
+			<COND>,,段落</COND>
+			<EXAMPLE>(条件と)次の1段落を実行する</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>17</ID>
+			<GR_TYPE>ELSE</GR_TYPE>
+			<CHAR>C + E + O + V</CHAR>
+			<RUN>または \n E</RUN>
+			<COND>それ 以外は, , 段落</COND>
+			<EXAMPLE>それ以外は次の1段落を実行する</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>19</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.処理委託</RUN>
+			<COND>, 安全モード</COND>
+			<EXAMPLE>[OBJECT]の安全モードを実行する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>20</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.ポップアップ実行</RUN>
+			<COND>, ポップアップウィンドウ</COND>
+			<EXAMPLE>[OBJECT]のポップアップウィンドウを実行する。</EXAMPLE>
+			<KEYWORD>ポップアップ実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>21</ID>
+			<GR_TYPE>FUNC</GR_TYPE>
+			<CHAR>F + E + O + V</CHAR>
+			<RUN>関数 F(VP)</RUN>
+			<COND>, 次の, 段落</COND>
+			<EXAMPLE>Fなら次の段落を実行する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>段落とは</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>22</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_機能連係選択</RUN>
+			<COND>フォーム,機能連係, -すると</COND>
+			<EXAMPLE>フォームの機能連係を実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>23</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_時間イベント</RUN>
+			<COND>フォーム,時間イベント, -すると</COND>
+			<EXAMPLE>フォームの時間イベントを実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>24</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _機能連係選択</RUN>
+			<COND>, 機能連係, -すると</COND>
+			<EXAMPLE>...の機能連係を実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>25</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>全域_オープン</RUN>
+			<COND>業務ルール, -すると</COND>
+			<EXAMPLE>業務ルールを実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>26</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>プログラム実行(OP)</RUN>
+			<COND>プログラム</COND>
+			<EXAMPLE>プログラム(...)を実行する</EXAMPLE>
+			<KEYWORD>プログラム実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>27</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + E + O + V</CHAR>
+			<RUN>B.E ()</RUN>
+			<COND>,,機能</COND>
+			<EXAMPLE>[OBJECT]の...機能を実行する。</EXAMPLE>
+			<KEYWORD>機能実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>28</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>E + O + E + V</CHAR>
+			<RUN>繰り返し (真) \n O</RUN>
+			<COND>次の, 段落, 繰り返し</COND>
+			<EXAMPLE>次の段落を繰り返し実行する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>29</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>報告書出力2(BP, 0, OP)</RUN>
+			<COND>パス, 報告書</COND>
+			<EXAMPLE>パス(...)の報告書( ...)を実行する。</EXAMPLE>
+			<HELP_EX>パス(...)の報告書(@出力する内容)を実行する。</HELP_EX>
+			<KEYWORD>報告書出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>30</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>報告書出力2(BP, 0, WP)</RUN>
+			<COND>パス, 報告書, 条件</COND>
+			<EXAMPLE>パス(...)の報告書を条件(...)で実行する。</EXAMPLE>
+			<HELP_EX>パス(...)の報告書を条件(@実行条件, @グループフィールド, @並べ替えフィールド, @実行テーブル)で実行する。</HELP_EX>
+			<KEYWORD>報告書出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>31</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>_その他の動作</RUN>
+			<COND>, その他の動作, -すると</COND>
+			<EXAMPLE>...のその他の動作を実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>32</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム.外部機能 (OP, 照会結果)</RUN>
+			<COND>外部機能</COND>
+			<EXAMPLE>外部機能(...)を実行する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>外部機能</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>33</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_システムイベント</RUN>
+			<COND>フォーム, システムイベント, -すると</COND>
+			<EXAMPLE>フォームのシステムイベントを実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>34</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _接続イベント</RUN>
+			<COND>, 接続イベント, -すると</COND>
+			<EXAMPLE>...の接続イベントを実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>35</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _JavaScriptイベント</RUN>
+			<COND>, JavaScriptイベント, -すると</COND>
+			<EXAMPLE>...のJavaScriptイベントを実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>36</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>外部アプリ連動実行(OP)</RUN>
+			<COND>外部アプリ連動</COND>
+			<EXAMPLE>外部アプリ連動(...)を実行する</EXAMPLE>
+			<KEYWORD>外部アプリ連動</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>37</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.音声認識実行</RUN>
+			<COND>, 音声認識</COND>
+			<EXAMPLE>[OBJECT]の音声認識を実行する</EXAMPLE>
+			<KEYWORD>音声認識</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>38</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.翻訳する実行</RUN>
+			<COND>, 翻訳する</COND>
+			<EXAMPLE>[OBJECT]の翻訳するを実行する</EXAMPLE>
+			<KEYWORD>音声認識</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>39</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.音声合成実行</RUN>
+			<COND>, 音声合成</COND>
+			<EXAMPLE>[OBJECT]の音声合成を実行する</EXAMPLE>
+			<KEYWORD>音声認識</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>40</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.画像認識実行</RUN>
+			<COND>, 画像認識</COND>
+			<EXAMPLE>[OBJECT]の画像認識を実行する</EXAMPLE>
+			<KEYWORD>画像認識</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>41</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム.アニメーション実行 (OP)</RUN>
+			<COND>アニメーション</COND>
+			<EXAMPLE>アニメーション(...)を実行する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>アニメーション実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>42</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.アニメーション実行</RUN>
+			<COND>, アニメーション</COND>
+			<EXAMPLE>[OBJECT]のアニメーションを実行する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>アニメーション実行</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>43</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _履修実行</RUN>
+			<COND>, 履修, -すると</COND>
+			<EXAMPLE>...の履修を実行すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>44</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>アトム変数関数実行(BP, O, OP)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の ...を実行する</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>45</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.開始</RUN>
+      <COND>, 再生</COND>
+      <EXAMPLE>...の再生を開始する。</EXAMPLE>
+      <KEYWORD>再生</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>46</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス_時間イベント</RUN>
+      <COND>サービス,時間イベント, -すると</COND>
+      <EXAMPLE>サービスの時間イベントを開始すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>47</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>オブジェクト作成('サービススクリプト', BP, 1, OP)</RUN>
+      <COND>パス, サービス</COND>
+      <EXAMPLE>パス(...)のサービスを開始する。</EXAMPLE>
+      <KEYWORD>サービス開始</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>48</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + W + V</CHAR>
+      <RUN>オブジェクト作成('フォーム', BP, '開始', OP)</RUN>
+      <COND>パス, フォーム, トップレベル</COND>
+      <EXAMPLE>パス(...)のフォームをトップレベルで開始する。</EXAMPLE>
+      <KEYWORD>子フォーム開始</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>49</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(真, '歩数サービス', OP)</RUN>
+      <COND>サービス, 歩数感知センサー</COND>
+      <EXAMPLE>サービスの 歩数感知センサーを開始する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>50</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(真, '#位置サービス', OP)</RUN>
+      <COND>サービス, 位置感知センサー</COND>
+      <EXAMPLE>サービスの 位置感知センサーを開始する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>51</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(真, ' Bluetooth', OP)</RUN>
+      <COND>サービス, Bluetooth</COND>
+      <EXAMPLE>サービスの Bluetoothを開始する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>52</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>フォーム.AIサービス(OP)</RUN>
+      <COND>AIサービス</COND>
+      <EXAMPLE>AIサービス(...)を開始する。</EXAMPLE>
+      <RESULT>成功可否</RESULT>
+      <KEYWORD>AIサービス</KEYWORD>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>表示</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>メッセージ(OP, VP)</RUN>
+			<COND>文章, 画面</COND>
+			<EXAMPLE>文章(...)を画面に表示する('はいいいえ', '質問')。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>メッセージ表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>メッセージ(OP, VP)</RUN>
+			<COND>画面, 文章</COND>
+			<EXAMPLE>画面に文章(...)を表示する('はいいいえ', '質問')。</EXAMPLE>
+			<KEYWORD>メッセージ表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>メッセージ(O, VP)</RUN>
+			<COND>, 画面</COND>
+			<EXAMPLE>...を画面に表示する</EXAMPLE>
+			<KEYWORD>メッセージ表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + E + V</CHAR>
+			<RUN>O.再度表示</RUN>
+			<COND>, フォーム,再度</COND>
+			<EXAMPLE>[OBJECT]をフォームに再表示する。</EXAMPLE>
+			<KEYWORD>再表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B. 項目変更選択(OP, '表示')</RUN>
+			<COND>, 項目</COND>
+			<EXAMPLE>[OBJECT]の項目(...)を表示する</EXAMPLE>
+			<KEYWORD>検索バー項目表示変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.表示 (OP)</RUN>
+			<COND>, 行</COND>
+			<EXAMPLE>[OBJECT]の行(...)を表示する</EXAMPLE>
+			<HELP_EX>[OBJECT]の行(@行番号)を表示する</HELP_EX>
+			<KEYWORD>ツリー行表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.検索開始</RUN>
+			<COND>, データ</COND>
+			<EXAMPLE>[OBJECT]のデータを表示する。</EXAMPLE>
+			<KEYWORD>データ表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>B.基本検索キー動作('読む', '今')</RUN>
+			<COND>, 関連データ, フォーム</COND>
+			<EXAMPLE>[OBJECT]の関連データをフォームに表示する</EXAMPLE>
+			<KEYWORD>関連データ表示</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>通知表示(O, NP)</RUN>
+			<COND>, 通知</COND>
+			<EXAMPLE>...を通知に表示する</EXAMPLE>
+			<KEYWORD>通知表示</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>準備</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>DB処理文準備 (OP, 照会結果)</RUN>
+			<COND>DB処理文</COND>
+			<EXAMPLE>DB処理文(...)を準備する。</EXAMPLE>
+			<KEYWORD>DB処理文</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>検索</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>I.IP0.検索(B)</RUN>
+			<COND>,,位置</COND>
+			<EXAMPLE>[OBJECT]の中で...の位置を検索して</EXAMPLE>
+			<HELP_EX>[OBJECT]の中で@検索する文字列の位置を検索して</HELP_EX>
+			<RESULT>検索された位置</RESULT>
+			<KEYWORD>位置検索</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + E + V</CHAR>
+			<RUN>I.IP0.逆に検索(B)</RUN>
+			<COND>,,位置,後ろ</COND>
+			<EXAMPLE>[OBJECT]の中で...の位置を後ろから検索して</EXAMPLE>
+			<HELP_EX>[OBJECT]の中で@検索する文字列の位置を後ろから検索して</HELP_EX>
+			<RESULT>検索された位置</RESULT>
+			<KEYWORD>位置検索</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + E + V</CHAR>
+			<RUN>I.IP0.検索(B, E)</RUN>
+			<COND>,,位置,-から</COND>
+			<EXAMPLE>[OBJECT]の中で...の位置を ...から検索して</EXAMPLE>
+			<HELP_EX>[OBJECT]の中で@検索する文字列の位置を@指定された位置から検索して</HELP_EX>
+			<RESULT>検索された位置</RESULT>
+			<KEYWORD>位置検索</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.検索準備</RUN>
+			<COND>,データ,</COND>
+			<EXAMPLE>[OBJECT]のデータを検索する</EXAMPLE>
+			<KEYWORD>データ検索</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>変更</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O.IP0.実数に()</RUN>
+			<COND>,実数</COND>
+			<EXAMPLE>[OBJECT]を実数に変更して</EXAMPLE>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>形式変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O.IP0.整数に(NP)</RUN>
+			<COND>,整数</COND>
+			<EXAMPLE>[OBJECT]を整数(...)に変更して</EXAMPLE>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>形式変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.文字に(WP)</RUN>
+			<COND>,文字</COND>
+			<EXAMPLE>[OBJECT]を文字に(...)変更して</EXAMPLE>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>形式変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>暗号化('暗号化', O, NP)</RUN>
+			<COND>,暗号</COND>
+			<EXAMPLE>...を暗号(..., ...)に変更して</EXAMPLE>
+			<HELP_EX>...を暗号(@暗号化キー)に変更して</HELP_EX>
+			<RESULT>暗号化値</RESULT>
+			<KEYWORD>暗号化</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>暗号化('復号化', O, NP)</RUN>
+			<COND>,元の値</COND>
+			<EXAMPLE>...を元の値(..., ...)に変更して</EXAMPLE>
+			<HELP_EX>...を元の値(@暗号化キー)に変更して</HELP_EX>
+			<RESULT>解析された値</RESULT>
+			<KEYWORD>暗号化</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>カーソル変更(N)</RUN>
+			<COND>カーソル</COND>
+			<EXAMPLE>カーソルを...に変更する。</EXAMPLE>
+			<HELP_EX>カーソルを'矢印'|'砂時計'|'進行'に変更する。</HELP_EX>
+			<KEYWORD>カーソル変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + O + N + V</CHAR>
+			<RUN>I.IP0.置換(O, N)</RUN>
+			<COND />
+			<EXAMPLE>[OBJECT]の中で...を...に変更して</EXAMPLE>
+			<HELP_EX>[OBJECT]の中で@変わる文字列を@変える文字列に変更して</HELP_EX>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>置換</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O.IP0.大文字()</RUN>
+			<COND>,大文字</COND>
+			<EXAMPLE>[OBJECT]を大文字に変更して</EXAMPLE>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>大小文字変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O.IP0.小文字()</RUN>
+			<COND>,小文字</COND>
+			<EXAMPLE>[OBJECT]を小文字に変更して</EXAMPLE>
+			<RESULT>変更された値</RESULT>
+			<KEYWORD>大小文字変更</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>I _選択変更</RUN>
+			<COND>,項目, 選択</COND>
+			<EXAMPLE>...の中で項目の選択を変更すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V + N</CHAR>
+			<RUN>I _選択変更完了</RUN>
+			<COND>,項目, 選択, ,-に</COND>
+			<EXAMPLE>...の中で項目の選択を変更した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>フォーム.クエリ修正(BP, O, 偽, N)</RUN>
+			<COND>DB処理文</COND>
+			<EXAMPLE>DB処理文(...)の'実行条件'を....に変更する</EXAMPLE>
+			<HELP_EX>DB処理文(...)の'実行条件'を@変更内容に変更する</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _値変更</RUN>
+			<COND>,値</COND>
+			<EXAMPLE>...の値を変更すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+      <ID>14</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _ページ変更</RUN>
+      <COND>,ページ</COND>
+    <EXAMPLE>...のページを変更すると</EXAMPLE>
+  </Patterns>
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _選択年月変更</RUN>
+      <COND>,選択年月</COND>
+      <EXAMPLE>...の選択年月を変更すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>17</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _チャットルーム変更</RUN>
+      <COND>,チャットルーム</COND>
+      <EXAMPLE>...のチャットルームを変更すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>終了</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.閉じる</RUN>
+			<COND>, 接続</COND>
+			<EXAMPLE>...の接続を終了する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O.閉じる</RUN>
+			<COND />
+			<EXAMPLE>...を終了する。</EXAMPLE>
+			<KEYWORD>フォーム終了</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>終了</RUN>
+			<COND>段落, 実行</COND>
+			<EXAMPLE>段落の実行を終了する。</EXAMPLE>
+			<KEYWORD>段落終了</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>抜け</RUN>
+			<COND>繰り返し, 実行</COND>
+			<EXAMPLE>繰り返し実行を終了する。</EXAMPLE>
+			<KEYWORD>繰り返し終了</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>全域_接続終了</RUN>
+			<COND>接続, -すると</COND>
+			<EXAMPLE>接続を終了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.音声合成終了</RUN>
+			<COND>, 音声合成</COND>
+			<EXAMPLE>[OBJECT]の音声合成を終了する。</EXAMPLE>
+			<KEYWORD>音声合成</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.音声認識終了</RUN>
+			<COND>, 音声認識</COND>
+			<EXAMPLE>[OBJECT]の音声認識を終了する。</EXAMPLE>
+			<KEYWORD>音声認識</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O.Bluetooth終了</RUN>
+			<COND />
+			<EXAMPLE>...を終了する。</EXAMPLE>
+			<KEYWORD>Bluetooth終了</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _履修終了</RUN>
+			<COND>, 履修, -すると</COND>
+			<EXAMPLE>...の履修を終了すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>サービス_終了</RUN>
+      <COND>サービス, -すると</COND>
+      <EXAMPLE>サービスを終了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>11</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>アプリ終了</RUN>
+      <COND>アプリ</COND>
+      <EXAMPLE>アプリを終了する。</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>12</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _タイマー終了</RUN>
+      <COND>, タイマー, -すると</COND>
+      <EXAMPLE>...のタイマーを終了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>13</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(偽 , '#位置サービス', OP)</RUN>
+      <COND>サービス, 位置感知センサー</COND>
+      <EXAMPLE>サービスの 位置感知センサーを終了する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>14</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(偽 , '#歩数サービス', OP)</RUN>
+      <COND>サービス, 歩数感知センサー</COND>
+      <EXAMPLE>サービスの 歩数感知センサーを終了する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス.センサー初期化(偽 , ' Bluetooth', OP)</RUN>
+      <COND>サービス, Bluetooth</COND>
+      <EXAMPLE>サービスの Bluetoothを終了する。</EXAMPLE>
+      <KEYWORD>センサー初期化</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>16</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス_終了完了</RUN>
+      <COND>サービス, Bluetooth, -すると</COND>
+      <EXAMPLE>サービスのBluetoothを終了すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>移動</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>B + N + V</CHAR>
+			<RUN>続けて</RUN>
+			<COND>段落, 最初</COND>
+			<EXAMPLE>段落の最初に移動する</EXAMPLE>
+			<KEYWORD>段落移動</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.フォーカスを与える</RUN>
+			<COND>, フォーカス</COND>
+			<EXAMPLE>[OBJECT]にフォーカスを移動する。</EXAMPLE>
+			<KEYWORD>フォーカス取得</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.移動(EP)</RUN>
+			<COND>, -だけ</COND>
+			<EXAMPLE>[OBJECT]を座標(..., ...)だけ移動する。</EXAMPLE>
+			<KEYWORD>フォーカス移動</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _フォーカスを得る</RUN>
+			<COND>, フォーカス, -すると</COND>
+			<EXAMPLE>...にフォーカスを移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _フォーカスを失う</RUN>
+			<COND>, フォーカス, -すると</COND>
+			<EXAMPLE>...の中でフォーカスを移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _処理項目移動</RUN>
+			<COND>, 処理項目, -すると</COND>
+			<EXAMPLE>...の中で処理項目を移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + N + H + V</CHAR>
+			<RUN>B _マウス上</RUN>
+			<COND>, 内, カーソル, -すると</COND>
+			<EXAMPLE>...の内にカーソルが移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + N + H + V</CHAR>
+			<RUN>B _マウス外</RUN>
+			<COND>, 外, カーソル, -すると</COND>
+			<EXAMPLE>...の外にカーソルが移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>H + N + O + V</CHAR>
+			<RUN>H _スクロール内移動</RUN>
+			<COND>, スクロール内, 焦点, -すると</COND>
+			<EXAMPLE>...このスクロール内に焦点を移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>O = N</RUN>
+			<COND/>
+			<EXAMPLE>...を...に移動する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + N + V</CHAR>
+			<RUN>B _最初行移動</RUN>
+			<COND>, 最初の行, -すると</COND>
+			<EXAMPLE>...の最初の行に移動すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + N + V</CHAR>
+			<RUN>B _最後行移動</RUN>
+			<COND>, 最後の行, -すると</COND>
+			<EXAMPLE>...の最後の行に移動すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>成功</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _決済成功</RUN>
+			<COND>, 決済, -すると</COND>
+			<EXAMPLE>...の決済を成功すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _広告成功</RUN>
+			<COND>, 実行, -すると</COND>
+			<EXAMPLE>...の実行を成功すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _ビリングキー決済成功</RUN>
+			<COND>, ビリングキー決済, -すると</COND>
+			<EXAMPLE>...のビリングキー決済を成功すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _ビリングキー発給成功</RUN>
+			<COND>, ビリングキー発給, -すると</COND>
+			<EXAMPLE>...のビリングキー発給を成功すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+      	<ID>5</ID>
+     	<GR_TYPE>EVENT</GR_TYPE>
+      	<CHAR>B + O + V</CHAR>
+      	<RUN>B _オープン認証成功</RUN>
+      	<COND>, オープン認証, -すると</COND>
+      	<EXAMPLE>...のオープン認証を成功すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _チャットルーム生成成功</RUN>
+      <COND>, チャットルーム生成, -すると</COND>
+      <EXAMPLE>...のチャットルーム生成を成功すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _本人認証成功</RUN>
+      <COND>, 本人認証, -すると</COND>
+      <EXAMPLE>...の本人認証を成功すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>フォーム_問題解き成功</RUN>
+      <COND>フォーム, 問題解き, -すると</COND>
+      <EXAMPLE>フォームの問題解きを成功すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _問題解き成功</RUN>
+      <COND>, 問題解き, -すると</COND>
+      <EXAMPLE>...の問題解きを成功すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _認証成功</RUN>
+      <COND>, 認証, -면</COND>
+      <EXAMPLE>...の認証を成功すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>失敗</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V + E</CHAR>
+			<RUN>実行結果 = -1</RUN>
+			<COND>, 場合</COND>
+			<EXAMPLE>失敗する場合には</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _決済失敗</RUN>
+			<COND>, 決済, -すると</COND>
+			<EXAMPLE>...の決済を失敗すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _広告失敗</RUN>
+			<COND>, 実行, -すると</COND>
+			<EXAMPLE>...の実行を失敗すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _ビリングキー決済失敗</RUN>
+			<COND>, ビリングキー決済, -すると</COND>
+			<EXAMPLE>...のビリングキー決済を失敗すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _ビリングキー発給失敗</RUN>
+			<COND>, ビリングキー発給, -すると</COND>
+			<EXAMPLE>...のビリングキー発給を失敗すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _オープン認証失敗</RUN>
+      <COND>, オープン認証, -すると</COND>
+      <EXAMPLE>...のオープン認証を失敗すると</EXAMPLE>
+  </Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _チャットルーム生成失敗</RUN>
+      <COND>, チャットルーム生成, -すると</COND>
+      <EXAMPLE>...のチャットルーム生成を失敗すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _本人認証失敗</RUN>
+      <COND>, 本人認証, -すると</COND>
+      <EXAMPLE>...の本人認証を失敗すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>フォーム_問題解き失敗</RUN>
+      <COND>フォーム, 問題解き, -すると</COND>
+      <EXAMPLE>フォームの問題解きを失敗すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _問題解き失敗</RUN>
+      <COND>, 問題解き, -すると</COND>
+      <EXAMPLE>...の問題解きを失敗すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>11</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _認証失敗</RUN>
+      <COND>, 認証, -すると</COND>
+      <EXAMPLE>...の問題解きを失敗すると</EXAMPLE>
+    </Patterns>
+
+	</Verb>
+	<Verb>
+		<VERBID>展開</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.ツリー展開(OP, VP)</RUN>
+			<COND>, 行</COND>
+			<EXAMPLE>[OBJECT]の行(...)を展開(...)する</EXAMPLE>
+			<HELP_EX>[OBJECT]の行(@行番号)を展開('拡張'|'縮小'|'自動')する</HELP_EX>
+			<KEYWORD>ツリー展開</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>伝達</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>PARAM</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND />
+			<EXAMPLE>...を伝達して</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>追加</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>フォーム.質疑修正(BP, '実行条件', 真, O)</RUN>
+			<COND>DB処理文, 実行条件</COND>
+			<EXAMPLE>DB処理文(...)の実行条件に...を追加する</EXAMPLE>
+			<HELP_EX>DB処理文(...)の実行条件に@追加する条件を追加する</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>フォーム.質疑修正(BP, N, 真, O)</RUN>
+			<COND>DB処理文</COND>
+			<EXAMPLE>DB処理文(...)の...に...を追加する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.追加 (N1P, O)</RUN>
+			<COND>,,行</COND>
+			<EXAMPLE>...に...を行(...)に追加する。</EXAMPLE>
+			<HELP_EX>...に@追加する配列を行(@行番号)に追加する。</HELP_EX>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.行追加 (N1P, O)</RUN>
+			<COND>BrowseAtom/ReportBrowseAtom/WebBoardAtom,,行</COND>
+			<EXAMPLE>[OBJECT]に...を行(...)に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に@追加する配列を行(@行番号)に追加する。</HELP_EX>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.行追加 (N1P, O)</RUN>
+			<COND>TreeAtom,,行</COND>
+			<EXAMPLE>[OBJECT]に...を行(...)に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に@追加する配列を行(@行番号)に追加する。</HELP_EX>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.グリッド行追加 (N1P, O)</RUN>
+			<COND>DBGridExAtom/StructureGridAtom,,行</COND>
+			<EXAMPLE>[OBJECT]に...を行(...)に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に@追加する配列を行(@行番号)に追加する。</HELP_EX>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.行追加 (OP)</RUN>
+			<COND>,行</COND>
+			<EXAMPLE>[OBJECT]に行(...)を追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に行(@行番号)を追加する。</HELP_EX>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.列追加 (N1P, O)</RUN>
+			<COND>,,列</COND>
+			<EXAMPLE>[OBJECT]に...を列(...)に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に@追加する配列を列(@列名または列番号)に追加する。</HELP_EX>
+			<KEYWORD>列追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.列追加 (OP)</RUN>
+			<COND>,列</COND>
+			<EXAMPLE>[OBJECT]に列(...)を追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]に列(@列情報)を追加する。</HELP_EX>
+			<KEYWORD>列追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.フィールド追加 (OP, N1)</RUN>
+			<COND>,フィールド</COND>
+			<EXAMPLE>[OBJECT]にフィールド(...)を...に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]にフィールド(@位置)を@構成情報に追加する。</HELP_EX>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>フィールド追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + N + V</CHAR>
+			<RUN>N.メモリー追加 (OP, N1)</RUN>
+			<COND>,メモリー</COND>
+			<EXAMPLE>[OBJECT]にメモリー(...)を...に追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]にメモリー(@位置)を@構成情報に追加する。</HELP_EX>
+			<KEYWORD>メモリー追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>B.メニュー追加 (NP, O)</RUN>
+			<COND>,機能連係</COND>
+			<EXAMPLE>[OBJECT]の機能連係(...)に ...を追加する。</EXAMPLE>
+			<HELP_EX>[OBJECT]の機能連係(@位置)に@連係情報を追加する。</HELP_EX>
+			<KEYWORD>機能連係追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _行追加</RUN>
+			<COND>, 行, -すると</COND>
+			<EXAMPLE>...に行を追加すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _列追加</RUN>
+			<COND>, 列, -すると</COND>
+			<EXAMPLE>...に列を追加すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.線結び情報('追加', OP)</RUN>
+      <COND>, 線結び情報</COND>
+      <EXAMPLE>..の線結び情報を追加する。</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>挿入</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>B.追加(NP, O)</RUN>
+			<COND>,行</COND>
+			<EXAMPLE>[OBJECT]の行(...)に...を挿入する。</EXAMPLE>
+			<HELP_EX>[OBJECT]の行(@行番号)に@挿入するデータを挿入する</HELP_EX>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>行追加</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>開始</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.処理開始</RUN>
+			<COND>, 一括処理</COND>
+			<EXAMPLE>[OBJECT]に一括処理を開始する</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>時間測定('開始')</RUN>
+			<COND>時間測定,</COND>
+			<EXAMPLE>時間測定を開始する。</EXAMPLE>
+			<KEYWORD>時間測定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _音声認識開始</RUN>
+			<COND>, 音声認識, -すると</COND>
+			<EXAMPLE>...の音声認識を開始すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _翻訳する開始</RUN>
+			<COND>, 翻訳する, -すると</COND>
+			<EXAMPLE>...の翻訳するを開始すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _音声合成開始</RUN>
+			<COND>, 音声合成, -すると</COND>
+			<EXAMPLE>...の音声合成を開始すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>サービス_開始</RUN>
+      <COND>サービス, -すると</COND>
+      <EXAMPLE>サービスを開始すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.受信開始</RUN>
+      <COND>, 受信</COND>
+			<EXAMPLE>...の受信を開始する。</EXAMPLE>
+      <KEYWORD>受信開始</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.送信開始</RUN>
+      <COND>, 送信</COND>
+			<EXAMPLE>...の送信を開始する。</EXAMPLE>
+      <KEYWORD>送信開始</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _再生開始</RUN>
+      <COND>, 再生, -すると</COND>
+      <EXAMPLE>...の再生を開始すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>中止</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>時間測定('中止', OP)</RUN>
+			<COND>時間測定</COND>
+			<EXAMPLE>時間測定(...)を中止する。</EXAMPLE>
+			<HELP_EX>時間測定(@タイトル)を中止する。</HELP_EX>
+			<RESULT>測定された時間</RESULT>
+			<KEYWORD>時間測定</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム.アニメーション中止 (OP)</RUN>
+			<COND>アニメーション</COND>
+			<EXAMPLE>アニメーション(...)を中止する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>アニメーション中止</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.アニメーション中止　(OP)</RUN>
+			<COND>, アニメーション</COND>
+			<EXAMPLE>[OBJECT]の アニメーション(...)を中止する。</EXAMPLE>
+			<RESULT>成功可否</RESULT>
+			<KEYWORD>アニメーション中止</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>4</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.受信開始</RUN>
+      <COND>, 受信</COND>
+      <EXAMPLE>...の受信を中止する。</EXAMPLE>
+      <KEYWORD>受信開始</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>5</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.送信開始</RUN>
+      <COND>, 送信</COND>
+      <EXAMPLE>...の送信を中止する。</EXAMPLE>
+      <KEYWORD>送信開始</KEYWORD>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>キャンセル</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.処理元に戻す</RUN>
+			<COND>,安全モード</COND>
+			<EXAMPLE>[OBJECT]の 安全モードをキャンセルする。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>元に戻す</RUN>
+			<COND>段落,実行</COND>
+			<EXAMPLE>段落の実行をキャンセルする</EXAMPLE>
+			<KEYWORD>段落キャンセル</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>トランザクションメッセージ(0)</RUN>
+			<COND>DB処理</COND>
+			<EXAMPLE>DB処理をキャンセルする。</EXAMPLE>
+			<KEYWORD>トランザクションメッセージ</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>解除</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 偽</RUN>
+			<COND />
+			<EXAMPLE>...を解除する</EXAMPLE>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム.時間イベント('解除', OP)</RUN>
+			<COND>フォーム,時間イベント,</COND>
+			<EXAMPLE>フォームの 時間イベントを解除する。</EXAMPLE>
+			<KEYWORD>時間イベント解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.ユーザーメッセージ(偽)</RUN>
+			<COND>,案内文章,</COND>
+			<EXAMPLE>[OBJECT]の案内文章を解除する。</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>ユーザーメッセージ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 偽</RUN>
+			<COND>,属性</COND>
+			<EXAMPLE>... 属性を解除する</EXAMPLE>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.ナビゲーションバー('解除')</RUN>
+			<COND>フォーム,ナビゲーションバー</COND>
+			<EXAMPLE>フォームの ナビゲーションバーを解除する。</EXAMPLE>
+			<KEYWORD>ナビゲーションバー解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>アトム変数(BP, O, 偽)</RUN>
+			<COND>アトム変数</COND>
+			<EXAMPLE>アトム変数(...)の...を解除する。</EXAMPLE>
+			<KEYWORD>アトム変数</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>アラーム機能('解除', OP)</RUN>
+			<COND>アラーム機能</COND>
+			<EXAMPLE>アラーム機能を解除する</EXAMPLE>
+			<KEYWORD>アラーム機能</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>許可</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 真</RUN>
+			<COND />
+			<EXAMPLE>...を許可する</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 真</RUN>
+			<COND>,属性</COND>
+			<EXAMPLE>... 属性を許可する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>禁止</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 偽</RUN>
+			<COND />
+			<EXAMPLE>...を禁止する</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 真</RUN>
+			<COND>,属性</COND>
+			<EXAMPLE>...属性を禁止する</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>属性設定解除</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>削除</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.全て削除</RUN>
+			<COND>, 全て</COND>
+			<EXAMPLE>[OBJECT]を全て削除する。</EXAMPLE>
+			<KEYWORD>全て削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I.全て削除(OP)</RUN>
+			<COND>DBGridExAtom, 一部</COND>
+			<EXAMPLE>[OBJECT]の中で一部(...)を削除する。</EXAMPLE>
+			<HELP_EX>[OBJECT]の中で一部(@除外対象)を削除する。</HELP_EX>
+			<KEYWORD>一部削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.削除 (OP)</RUN>
+			<COND>, 行</COND>
+			<EXAMPLE>[OBJECT]の行(@行番号)を削除する。</EXAMPLE>
+			<KEYWORD>行削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.行削除 (OP)</RUN>
+			<COND>ScrollAtom/ExtensionScroll/DBGridExAtom/TreeAtom/StructureGrid, 行</COND>
+			<EXAMPLE>[OBJECT]の行(@行番号)を削除する。</EXAMPLE>
+			<KEYWORD>行削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.行削除 (-1, OP)</RUN>
+			<COND>BrowseAtom/ReportBrowseAtom/WebBoardAtom, 行</COND>
+			<EXAMPLE>[OBJECT]の行(@行番号)を削除する。</EXAMPLE>
+      <KEYWORD>行削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.列削除 (OP)</RUN>
+			<COND>, 列</COND>
+			<EXAMPLE>[OBJECT]の列(@列番号)を削除する。</EXAMPLE>
+			<KEYWORD>列削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + X + O + V</CHAR>
+			<RUN>I.行削除 ('チェック')</RUN>
+			<COND>,チェック</COND>
+			<EXAMPLE>[OBJECT]の中でチェックした行を削除する</EXAMPLE>
+			<KEYWORD>行削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + X + O + V</CHAR>
+			<RUN>I.行削除 ('選択')</RUN>
+			<COND>,選択</COND>
+			<EXAMPLE>[OBJECT]の中で選択した行を削除する</EXAMPLE>
+			<KEYWORD>行削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.フィールド削除 (OP)</RUN>
+			<COND>, フィールド</COND>
+			<EXAMPLE>[OBJECT]のフィールド(...)を削除する。</EXAMPLE>
+			<KEYWORD>フィールド削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.メモリー削除 (OP)</RUN>
+			<COND>, メモリー</COND>
+			<EXAMPLE>[OBJECT]のメモリー(...)を削除する。</EXAMPLE>
+			<KEYWORD>メモリー削除</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.メニュー削除 (OP)</RUN>
+			<COND>, 機能連係</COND>
+			<EXAMPLE>[OBJECT]の機能連係(@番号)を削除する。</EXAMPLE>
+			<KEYWORD>機能連係追加</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _行削除</RUN>
+			<COND>, 行, -すると</COND>
+			<EXAMPLE>...の中で行を削除すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _列削除</RUN>
+			<COND>, 列, -すると</COND>
+			<EXAMPLE>...の中で列を削除すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _削除</RUN>
+			<COND>, データ, -すると</COND>
+			<EXAMPLE>...の中でデータを削除すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>16</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.線結び情報('削除', OP)</RUN>
+      <COND>, 線結び情報</COND>
+      <EXAMPLE>...の線結び情報を削除する。</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>選択</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択値('選択', '全体')</RUN>
+			<COND>,-した, 全体データ</COND>
+			<EXAMPLE>[OBJECT]の中で選択した全体データ</EXAMPLE>
+			<RESULT>選択データ</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択値('選択', '参照')</RUN>
+			<COND>,-した, 参照データ</COND>
+			<EXAMPLE>[OBJECT]の中で選択した参照データ</EXAMPLE>
+			<RESULT>選択データ</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.選択値('複数選択', '全体')</RUN>
+			<COND>, 複数, -した, 全体データ</COND>
+			<EXAMPLE>[OBJECT]の中で複数選択した全体データ</EXAMPLE>
+			<RESULT>選択データ</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.選択値('複数選択', '参照')</RUN>
+			<COND>, 複数, -した, 参照データ</COND>
+			<EXAMPLE>[OBJECT]の中で複数選択した参照データ</EXAMPLE>
+			<RESULT>選択データ</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択行('選択')</RUN>
+			<COND>,-した, 行番号</COND>
+			<EXAMPLE>[OBJECT]の中で選択した行番号</EXAMPLE>
+			<RESULT>選択行番号</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.選択行('複数選択')</RUN>
+			<COND>, 複数, -した, 行番号</COND>
+			<EXAMPLE>[OBJECT]の中で複数選択した行番号</EXAMPLE>
+			<RESULT>選択行番号</RESULT>
+			<KEYWORD>選択データ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>全域_メニュー選択</RUN>
+			<COND>メニュー, -すると</COND>
+			<EXAMPLE>メニューを選択すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _文書選択</RUN>
+			<COND>, 項目, -すると</COND>
+			<EXAMPLE>...の中で項目を選択すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _ファイルオープン</RUN>
+			<COND>, ファイル, -すると</COND>
+			<EXAMPLE>...の中でファイルを選択すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _ポップアップ完了</RUN>
+			<COND>, データ, -すると</COND>
+			<EXAMPLE>...の中でデータを選択すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _日程選択</RUN>
+			<COND>, 日程, -すると</COND>
+			<EXAMPLE>...の中で日程を選択すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>チェック</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択値('チェック', '全体')</RUN>
+			<COND>,-した, 全体データ</COND>
+			<EXAMPLE>[OBJECT]の中でチェックした全体データ</EXAMPLE>
+			<RESULT>チェックデータ</RESULT>
+			<KEYWORD>チェックデータ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択値('チェック', '参照')</RUN>
+			<COND>,-した, 参照データ</COND>
+			<EXAMPLE>[OBJECT]の中でチェックした参照データ</EXAMPLE>
+			<RESULT>チェックデータ</RESULT>
+			<KEYWORD>チェックデータ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.選択行('チェック')</RUN>
+			<COND>,-した, 行番号</COND>
+			<EXAMPLE>[OBJECT]の中でチェックした行番号</EXAMPLE>
+			<RESULT>チェック行</RESULT>
+			<KEYWORD>チェックデータ</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>計算</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.演算実行</RUN>
+			<COND>, 演算式</COND>
+			<EXAMPLE>[OBJECT]の演算式を計算する</EXAMPLE>
+			<KEYWORD>演算式計算</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>OP</RUN>
+			<COND>式</COND>
+			<EXAMPLE>式(...)を計算する</EXAMPLE>
+			<RESULT>計算結果</RESULT>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>日付計算(OP)</RUN>
+			<COND>日付</COND>
+			<EXAMPLE>日付(...)を計算する</EXAMPLE>
+			<HELP_EX>日付(@区分定数, @基準日, @計算日, @区分表示)を計算する</HELP_EX>
+			<RESULT>計算された日付</RESULT>
+			<KEYWORD>日付計算</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>時間計算(OP)</RUN>
+			<COND>時間</COND>
+			<EXAMPLE>時間(...)を計算する</EXAMPLE>
+			<HELP_EX>時間(@区分定数, @基準時間, @計算時間)を計算する</HELP_EX>
+			<RESULT>計算された時間</RESULT>
+			<KEYWORD>時間計算</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>大き</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &lt;= T</RUN>
+			<COND>, , -く, なければ</COND>
+			<EXAMPLE>...が...より大きくなければ</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>大きい</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &gt;= T</RUN>
+			<COND>, , -か, 等しい</COND>
+			<EXAMPLE>...が...より大きいか等しい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V</CHAR>
+			<RUN>H &gt; T</RUN>
+			<COND>,</COND>
+			<EXAMPLE>...が...より大きい場合は</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>小さ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &gt;= T</RUN>
+			<COND>, , -く, なければ</COND>
+			<EXAMPLE>...が...より小さくなければ</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>小さい</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &lt;= T</RUN>
+			<COND>, , -か, 等しい</COND>
+			<EXAMPLE>...が...より小さいか等しい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V</CHAR>
+			<RUN>H &lt; T</RUN>
+			<COND>,</COND>
+			<EXAMPLE>...が...より小さい場合は</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>等し</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -と, -く, なければ</COND>
+			<EXAMPLE>...が...と等しくなければ</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>等しい</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H = E</RUN>
+			<COND>, -と</COND>
+			<EXAMPLE>...が...と等しい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>, -と, -か, 小さい</COND>
+			<EXAMPLE>...が...と等しいか小さい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>, -と, -か, 小さい</COND>
+			<EXAMPLE>...が...と等しいか小さい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>, -と, -か, 大きい</COND>
+			<EXAMPLE>...が...と等しいか大きい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>, -と, -か, 大きい</COND>
+			<EXAMPLE>...が...と等しいか大きい場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>異な</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -と</COND>
+			<EXAMPLE>...が...と異なる場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>なく</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + H + V</CHAR>
+			<RUN>H &lt;&gt; H1</RUN>
+			<COND />
+			<EXAMPLE>...が...なく/ない場合</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>なければ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + H + V</CHAR>
+			<RUN>H &lt;&gt; H1</RUN>
+			<COND />
+			<EXAMPLE>...が...なければ/ない場合</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + W + V</CHAR>
+			<RUN>H &lt;&gt; W</RUN>
+			<COND />
+			<EXAMPLE>...が...でなければ</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>超過</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + O + V</CHAR>
+			<RUN>H &gt; O</RUN>
+			<COND />
+			<EXAMPLE>...が...を超過する場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>満足</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND>条件, </COND>
+			<EXAMPLE>条件(...)を満足する場合は</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>四捨五入</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O.IP0.小数点(VP, '四捨五入')</RUN>
+			<COND />
+			<EXAMPLE>[OBJECT]を四捨五入(...)して</EXAMPLE>
+			<HELP_EX>[OBJECT]を四捨五入(@四捨五入する桁数)して</HELP_EX>
+			<RESULT>四捨五入された値</RESULT>
+			<KEYWORD>四捨五入</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>出力</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>報告書出力(BP, OP)</RUN>
+			<COND>パス, 報告書</COND>
+			<EXAMPLE>パス(...)の報告書( ..., 'プレビュー')を出力する。</EXAMPLE>
+			<HELP_EX>パス(...)の報告書(@出力する内容, 'プレビュー')を出力する。</HELP_EX>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_出力</RUN>
+			<COND>フォーム, -すると</COND>
+			<EXAMPLE>フォームを出力すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>音声出力(O)</RUN>
+			<COND>, 音声</COND>
+			<EXAMPLE>...を音声で出力する。</EXAMPLE>
+			<KEYWORD>音声出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>デジタルピン出力(N, O)</RUN>
+			<COND>デジタルピン</COND>
+			<EXAMPLE>デジタルピンの...に...を出力する。</EXAMPLE>
+			<KEYWORD>デジタルピン出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>アナログピン出力(N, O)</RUN>
+			<COND>アナログピン</COND>
+			<EXAMPLE>アナログピンの...に...を出力する。</EXAMPLE>
+			<KEYWORD>アナログピン出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>サーボモーター出力(N, O)</RUN>
+			<COND>サーボモーター</COND>
+			<EXAMPLE>サーボモーターの...に...を出力する。</EXAMPLE>
+			<KEYWORD>サーボモーター出力</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>クリック</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _クリック</RUN>
+			<COND>, -すると</COND>
+			<EXAMPLE>...をクリックすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O _ダブルクリック</RUN>
+			<COND>,ダブル, -すると</COND>
+			<EXAMPLE>...をダブルクリックすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _チェッククリック</RUN>
+			<COND>,チェックボックス, -すると</COND>
+			<EXAMPLE>...の中でチェックボックスをクリックすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O _長くクリック</RUN>
+			<COND>,長く, -すると</COND>
+			<EXAMPLE>...を長くクリックすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _マーカークリック</RUN>
+			<COND>,マーカー, -すると</COND>
+			<EXAMPLE>...のマーカーをクリックすると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _アイコンクリック</RUN>
+      <COND>,アイコン, -すると</COND>
+      <EXAMPLE>...のマーカーをクリックすると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>接続</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + V</CHAR>
+			<RUN>全域_サーバー接続</RUN>
+			<COND>サーバー, -すると</COND>
+			<EXAMPLE>サーバーに接続すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>交換</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>全域_メニュー交換</RUN>
+			<COND>メニュー, -すると</COND>
+			<EXAMPLE>メニューを交換すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>開く</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_オープン</RUN>
+			<COND>フォーム, -と</COND>
+			<EXAMPLE>フォームを開くと</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>閉じる</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_閉じる</RUN>
+			<COND>フォーム, -と</COND>
+			<EXAMPLE>フォームを閉じると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>子フォーム_閉じる</RUN>
+			<COND>子フォーム, -と</COND>
+			<EXAMPLE>子フォームを閉じると</EXAMPLE>
+		</Patterns>
+	</Verb>
+  <Verb>
+    <VERBID>活性化</VERBID>
+    <Patterns>
+      <ID>1</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>フォーム_活性化</RUN>
+      <COND>フォーム, -すると</COND>
+      <EXAMPLE>フォームを活性化すると</EXAMPLE>
+    </Patterns>
+  </Verb>
+	<Verb>
+		<VERBID>タッチ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_タッチ</RUN>
+			<COND>フォーム, -すると</COND>
+			<EXAMPLE>フォームをタッチすると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>端末回転</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_端末回転</RUN>
+			<COND>フォーム, -すると</COND>
+			<EXAMPLE>フォームを端末回転すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>回転</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_回転</RUN>
+			<COND>フォーム, -すると</COND>
+			<EXAMPLE>フォームを回転すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>呼び出し</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>X + I + V</CHAR>
+			<RUN>フォーム_呼び出し確認</RUN>
+			<COND>他, フォーム, -すると</COND>
+			<EXAMPLE>他のフォームの中で呼び出しすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_呼び出し</RUN>
+			<COND>ドキュメントモデル, -すると</COND>
+			<EXAMPLE>ドキュメントモデルを呼び出しすると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>入力</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + W + V</CHAR>
+			<RUN>フォーム_キー入力</RUN>
+			<COND>フォーム, キーボード, -すると</COND>
+			<EXAMPLE>フォームの中でキーボードで入力すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + W + V</CHAR>
+			<RUN>I _キー入力</RUN>
+			<COND>, キーボード, -すると</COND>
+			<EXAMPLE>...の中でキーボードで入力すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _キー押す</RUN>
+			<COND>, 機能キー, -すると</COND>
+			<EXAMPLE>...に機能キーを入力すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + W + O + V</CHAR>
+			<RUN>N _ポップアップ動作</RUN>
+			<COND>, ポップアップ動作, データ, -すると</COND>
+			<EXAMPLE>...にポップアップ動作でデータを入力すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>デジタルピン読み込み(O)</RUN>
+			<COND>デジタルピン</COND>
+			<EXAMPLE>デジタルピンの...番を入力して</EXAMPLE>
+			<KEYWORD>デジタルピン読み込み</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>アナログピン読み込み(O)</RUN>
+			<COND>アナログピン</COND>
+			<EXAMPLE>アナログピンの...番を入力して</EXAMPLE>
+			<KEYWORD>アナログピン読み込み</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _音声コマンド入力</RUN>
+			<COND>, コマンド, -すると</COND>
+			<EXAMPLE>...のコマンドを入力すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>完了</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>B _検索完了</RUN>
+			<COND>, 検索, ,-に</COND>
+			<EXAMPLE>...の検索を完了した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>フォーム_検索完了</RUN>
+			<COND>フォーム, 検索, ,-に</COND>
+			<EXAMPLE>フォームの検索を完了した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>フォーム_保存完了前</RUN>
+			<COND>フォーム, 保存, -する, -に</COND>
+			<EXAMPLE>フォームの保存を完了する前に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>フォーム_保存完了後</RUN>
+			<COND>フォーム, 保存, , -に</COND>
+			<EXAMPLE>フォームの保存を完了した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>トランザクションメッセージ(1)</RUN>
+			<COND>DB処理</COND>
+			<EXAMPLE>DB処理を完了する。</EXAMPLE>
+			<KEYWORD>トランザクションメッセージ</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_ドキュメント出力完了</RUN>
+			<COND>ドキュメントモデル, 出力, -すると</COND>
+			<EXAMPLE>ドキュメントモデルの出力を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>子フォーム_印刷出力</RUN>
+			<COND>子フォーム, ドキュメントモデル, 出力, -すると</COND>
+			<EXAMPLE>子フォームの中でドキュメントモデルの出力を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>B _保存結果</RUN>
+			<COND>ドキュメントモデル, , 動作, -すると</COND>
+			<EXAMPLE>ドキュメントモデルの中で...の動作を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _入力完了</RUN>
+			<COND>, 入力, -すると</COND>
+			<EXAMPLE>...に入力を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>フォーム_決裁完了</RUN>
+			<COND>フォーム, 決裁, ,-に</COND>
+			<EXAMPLE>フォームの決裁を完了した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>フォーム_受付完了</RUN>
+			<COND>フォーム, 受付, ,-に</COND>
+			<EXAMPLE>フォームの受付を完了した後に</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_入力完了</RUN>
+			<COND>フォーム, 入力, -すると</COND>
+			<EXAMPLE>フォームの入力を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>外部アプリ_入力完了</RUN>
+			<COND>外部アプリ, 入力, -すると</COND>
+			<EXAMPLE>外部アプリの入力を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _問題解き完了</RUN>
+			<COND>, 問題解き, -すると</COND>
+			<EXAMPLE>...の問題解きを完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _ロード完了</RUN>
+			<COND>, ページング, -すると</COND>
+			<EXAMPLE>...のページングを完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _音声認識完了</RUN>
+			<COND>, 音声認識, -すると</COND>
+			<EXAMPLE>...の音声認識を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>17</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _翻訳する完了</RUN>
+			<COND>, 翻訳する, -すると</COND>
+			<EXAMPLE>...の翻訳するを完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>18</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _音声合成完了</RUN>
+			<COND>, 音声合成, -すると</COND>
+			<EXAMPLE>...の音声合成を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>19</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _受信完了</RUN>
+			<COND>, 受信, -すると</COND>
+			<EXAMPLE>...の受信を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>20</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _送信完了</RUN>
+			<COND>, 送信, -すると</COND>
+			<EXAMPLE>...の送信を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>21</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _連結完了</RUN>
+			<COND>, 連結, -すると</COND>
+			<EXAMPLE>...の連結を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>22</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _動画認識完了</RUN>
+			<COND>, 動画認識, -すると</COND>
+			<EXAMPLE>...の動画認識を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>23</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _再生完了</RUN>
+			<COND>, 再生, -すると</COND>
+			<EXAMPLE>...の再生を完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>24</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>フォーム_アニメーション完了</RUN>
+			<COND>フォーム, アニメーション, -すると</COND>
+			<EXAMPLE>フォームのアニメーションを完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>25</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _アニメーション完了</RUN>
+			<COND>, アニメーション, -すると</COND>
+			<EXAMPLE>...のアニメーションを完了すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>26</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _準備完了</RUN>
+			<COND>, 準備, -すると</COND>
+			<EXAMPLE>...の準備を完了すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      	<ID>27</ID>
+      	<GR_TYPE>EVENT</GR_TYPE>
+     		<CHAR>B + O + V</CHAR>
+      	<RUN>B _チャットルーム存在確認</RUN>
+      	<COND>, チャットルーム存在確認, -すると</COND>
+      	<EXAMPLE>...のチャットルーム存在確認を完了すると</EXAMPLE>
+    </Patterns>
+   	<Patterns>
+   			<ID>28</ID>
+    		<GR_TYPE>EVENT</GR_TYPE>
+   			<CHAR>B + O + V</CHAR>
+  			<RUN>B _拡大縮小完了</RUN>
+   			<COND>, 拡大縮小, -すると</COND>
+   			<EXAMPLE>...の拡大縮小を完了すると</EXAMPLE>
+   	</Patterns>
+    <Patterns>
+      <ID>29</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>フォーム準備完了</RUN>
+      <COND>フォーム, 準備, -すると</COND>
+      <EXAMPLE>フォームの準備を完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>30</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V </CHAR>
+      <RUN>フォーム_権限要求完了</RUN>
+      <COND>フォーム, 権限要求, -すると</COND>
+      <EXAMPLE>フォームの権限要求を完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>31</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _有効性検査完了</RUN>
+      <COND>, 有効性検査, -すると</COND>
+      <EXAMPLE>...の有効性検査を完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>32</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス_Bluetooth送信</RUN>
+      <COND>, Bluetooth送信, -すると</COND>
+      <EXAMPLE>サービスのBluetooth送信を完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>33</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス_Bluetooth受信</RUN>
+      <COND>, Bluetooth受信, -すると</COND>
+      <EXAMPLE>サービスのBluetooth受信を完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>34</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>フォーム_問題解き完了</RUN>
+      <COND>フォーム, 問題解き, -すると</COND>
+      <EXAMPLE>フォームの問題解きを完了すると</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>35</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>サービス受信完了</RUN>
+      <COND>, Webサービス受信, -すると</COND>
+      <EXAMPLE>サービスのWebサービス受信を完了すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>転換</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _タブ転換</RUN>
+			<COND>, タブ,-すると</COND>
+			<EXAMPLE>...のタブを転換すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム.F9切り替え</RUN>
+			<COND>選択表示</COND>
+			<EXAMPLE>選択表示を切り替えする。</EXAMPLE>
+			<KEYWORD>選択表示切り替え</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>隠す</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.項目変更選択(OP, '隠す')</RUN>
+			<COND>, 項目</COND>
+			<EXAMPLE>[OBJECT]の項目(...)を隠す</EXAMPLE>
+			<KEYWORD>検索バー項目表示変更</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>処理</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_ドキュメント台帳</RUN>
+			<COND>決裁</COND>
+			<EXAMPLE>決裁を処理すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>保存</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>フォーム_ドキュメントコピー完了</RUN>
+			<COND>ドキュメントモデル, ファイル, -すると</COND>
+			<EXAMPLE>ドキュメントモデルをファイルで保存すると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + W + V</CHAR>
+			<RUN>子フォーム_ファイル保存</RUN>
+			<COND>子フォーム, ドキュメントモデル, ファイル, -すると</COND>
+			<EXAMPLE>子フォームの中でドキュメントモデルをファイルで保存すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>増加</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + H + W + V</CHAR>
+			<RUN>I _自動増加</RUN>
+			<COND>, データ, 自動, -すると</COND>
+			<EXAMPLE>...の中でデータが自動で増加すると</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + H + V</CHAR>
+      <RUN>サービス_位置更新</RUN>
+      <COND>サービス, 位置情報, -すると</COND>
+      <EXAMPLE>サービスの位置情報が更新すると</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>更新</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>H + V</CHAR>
+			<RUN>H _位置更新</RUN>
+			<COND>, -すると</COND>
+			<EXAMPLE>...が更新すると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>登録</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>音声コマンド(O)</RUN>
+			<COND>音声コマンド,</COND>
+			<EXAMPLE>音声コマンドに...を登録する。</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>外部アプリアクション名(O)</RUN>
+			<COND>外部アプリアクション名,</COND>
+			<EXAMPLE>外部アプリアクション名に...を登録する。</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>トグル</VERBID>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = -1</RUN>
+			<COND />
+			<EXAMPLE>...をトグルする。</EXAMPLE>
+			<KEYWORD>属性設定トグル</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>ドラッグアンドドロップ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>フォーム_アトムドラッグアンドドロップ</RUN>
+			<COND>アトム, -すると</COND>
+			<EXAMPLE>アトムをドラッグアンドドロップすると</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _ドラッグアンドドロップ</RUN>
+			<COND>,-すると</COND>
+			<EXAMPLE>...をドラッグアンドドロップすると</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>送信</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>デジタルピン出力(N, O)</RUN>
+			<COND>デジタルピン</COND>
+			<EXAMPLE>デジタルピンの...に...を送信する。</EXAMPLE>
+			<KEYWORD>デジタルピン出力</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>アナログピン出力(N, O)</RUN>
+			<COND>アナログピン</COND>
+			<EXAMPLE>アナログピンの...に...を送信する。</EXAMPLE>
+			<KEYWORD>アナログピン出力</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>受信</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>デジタルピン読み込み(O, N)</RUN>
+			<COND>デジタルピン</COND>
+			<EXAMPLE>デジタルピン...を...に受信する。</EXAMPLE>
+			<KEYWORD>デジタルピン読み込み</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>アナログピン読み込み(O, N)</RUN>
+			<COND>アナログピン</COND>
+			<EXAMPLE>アナログピン...を...に受信する。</EXAMPLE>
+			<KEYWORD>アナログピン読み込み</KEYWORD>
+		</Patterns>
+	</Verb>
+</VerbDic>

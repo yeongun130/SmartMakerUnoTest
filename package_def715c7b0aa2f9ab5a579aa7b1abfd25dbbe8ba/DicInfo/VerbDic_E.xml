@@ -1,0 +1,1303 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="verbdic.xsl" ?>
+
+<!--
+// 자연어로 작성한 스크립트를 기호식 스크립트로 변환하는 것 지원 예정
+//사전은 별도로 Serialize 시켜서 구동시에 사전정보 생성에 드는 시간을 절약하자..
+//인덱스화시켜도 무방한 함수 또는 속성들에 대해서는 인덱스화 시켜서 저장하므로써 
+//컴파일 시간을 절약한다.
+//
+//사전파일을 생성할 때, 구조의 길이가 가장 긴것을 먼저 넣고, 다음은 조건이 있는 것을 먼저 넣는다.
+
+1. 품사의 종류
+ 명사 : OBJ_1   (명사 Noun) 
+ 동사  : V (Verb)
+ 키워드  : K (Keyword) 
+ 접속사  : J (접속사 conJunctions)
+ 보조사  : H (Help 대명사, 관사, 부사))
+ 파라메터문장 : P (Parameter)
+ 조건문장 : C  (Condition)
+ 이벤트 : F (Function Event)
+ 커서   : R (CURSOR)  -> 프로시저에서 사용
+ 문장 : A  
+
+//CPatternAnal.COMPONENT 및 COMP_TYPE 과 연결, 
+//A, B, C, D, E, F, H, I, K, OBJ_1, O, P, R, S, T, V, W, X
+
+
+2. XML 요소의 구성
+	 <ID>				: 패턴 고유번호 - 서술어별로 매겨지며 불변이다. 이 고유번호는 팝업메뉴의 우선순위 설정에 사용된다.
+	 <GR_TYPE>	: 문장의 종류를 판단한다. 대입문인지.. 함수인지.. 반복문인지 등등..
+   <CHAR>			: 문장의 패턴을 나타낸다. 문장성분의 조합, 주어+목적어+서술어 = S + O + V
+	 <RUN>			: 기호식 스크립트의 문법을 나타낸다. 사전정보를 만들 때 참고하므로 함부로 바꾸면 안 된다
+	 <COND>			: 조건 및 문장에 꼭 필요한 예약어이다 문장성분의 위치와 일치해야 한다.
+	 <EXAMPLE>	: 자연어 스크립트 예문이다.
+	 <HELP_EX>	: 파라메터에 대한 명칭이 붙어있는 예문이다. 추후 기능개선이 필요할 듯 하여 Example과 분리한 상태, Dic에는 HELP_EX우선 저장된다.
+	 <SHOW>			: FALSE이면 PopupHelp에 보이지 않는다, 지향하지 않는 문법, 여러가지 중복되는 문법 등을 사용자에게 보이지 않기 위해
+	 <RESULT>		: 함수가 실행한 후 반환값 (현재 사용 안함) 
+	 <KEYWORD>	: 편집기에서 F1을 눌렀을 때 Html Help에서 검색할 검색어
+
+
+3. XML 요소의 해석
+		<Patterns>
+			<ID>1</ID>											-> '표시하다' 에서 ID 1
+			<GR_TYPE>EXPR</GR_TYPE>         ->  문장종류 : 연산식
+
+			<CHAR>O + OBJ_1 + V</CHAR>          ->  문장성분 : 목적어+...에+서술어 
+			<RUN>메시지(OP, VP)</RUN>       ->  기호식으로 변경했을 때의 문법
+			<COND>문장, 화면</COND>         ->  목적어의 체언은 '문장', '...에'의 체언은 화면
+			<EXAMPLE>문장(...)를 화면에 표시한다('예아니오', '질문').</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+
+4. 문장성분의 해석
+ OP, A1P 처럼 알파벳 또는 숫자 조합의 해석 
+ 첫번째 문자 : 문장성분의 종류
+ 두번째 숫자 : 예약어에서 몇번째 문장성분이냐.. (Zero base)
+ 두번째 또는 세번째 문자 : 첫번째 문장 성분의 파라메터 (예를 들어 "검색창(1,2)의 항목크기"에서 (1,2)의 정보가 된다
+
+5. 기타
+[OBJECT] : 아톰만 들어가는 곳, 아톰에 제한적인 실행문을 필터링하기 위해
+
+
+
+-->
+<VerbDic>
+	<Verb>
+		<VERBID>is</VERBID>
+		<TENSE>are, being, been</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + OBJ_2</CHAR>
+			<RUN>OBJ_1 = OBJ_2</RUN>
+			<EXAMPLE>if ... is ...</EXAMPLE>
+			<HELP_EX></HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + OBJ_2 + or + more/over/above</CHAR>
+			<RUN>OBJ_1 &gt;= OBJ_2</RUN>
+			<EXAMPLE>if ... is ... or more</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + OBJ_2 + or + less/below/under</CHAR>
+			<RUN>OBJ_1 &lt;= OBJ_2</RUN>
+			<EXAMPLE>if ... is ... or less</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + less + than + OBJ_2 </CHAR>
+			<RUN>OBJ_1 &lt; OBJ_2</RUN>
+			<EXAMPLE>if ... is less than ... </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + under/below + OBJ_2 </CHAR>
+			<RUN>OBJ_1 &lt; OBJ_2</RUN>
+			<EXAMPLE>if ... is under ... </EXAMPLE>
+			<SHOW></SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + more + than + OBJ_2 </CHAR>
+			<RUN>OBJ_1 &gt; OBJ_2</RUN>
+			<EXAMPLE>if ... is more than ...</EXAMPLE>
+			<SHOW></SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + over/above + OBJ_2 </CHAR>
+			<RUN>OBJ_1 &gt; OBJ_2</RUN>
+			<EXAMPLE>if ... is over ...</EXAMPLE>
+			<SHOW></SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + not + OBJ_2 </CHAR>
+			<RUN>OBJ_1 &lt;&gt; OBJ_2</RUN>
+			<EXAMPLE>if ... is not ...</EXAMPLE>
+			<SHOW></SHOW>
+		</Patterns>
+
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>OBJ_1 + V + OBJ_2</CHAR>
+			<RUN>OBJ_1 = OBJ_2</RUN>
+			<COND />
+			<EXAMPLE>... is ...</EXAMPLE>
+		</Patterns>
+	</Verb>
+	
+	<Verb>
+		<VERBID>refer</VERBID>
+		<TENSE>refers, referring, referred</TENSE>		
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>OBJ_1 + V + to OBJ_2</CHAR>
+			<RUN>OBJ_1 = OBJ_2</RUN>
+			<EXAMPLE>... refers to ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + OBJ_1 + to OBJ_2</CHAR>
+			<RUN>OBJ_1 = OBJ_2</RUN>
+			<EXAMPLE>refers ... to ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>OBJ_1 + additionally + V + to OBJ_2</CHAR>
+			<RUN>OBJ_1.Additionalsubstitute(OBJ_2)</RUN>
+			<EXAMPLE>... additionally refers to ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>OBJ_1 + V + to OBJ_2 + in order</CHAR>
+			<RUN>OBJ_1 = OBJ_2(repeat_times)</RUN>
+			<EXAMPLE>... refers to ... in order.</EXAMPLE>
+			<HELP_EX>... refers to @array in order</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>OBJ_1 + V + to OBJ_2 + from OBJ_3 + in order</CHAR>
+			<RUN>OBJ_1 = OBJ_3(repeat_times, OBJ_2)</RUN>
+			<EXAMPLE>... refers to ... from ... in order.</EXAMPLE>
+			<HELP_EX>... refers to @column from @array in order</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>OBJ_1 + V + to login + information(정보종류) + by OBJ_2</CHAR>
+			<RUN>OBJ_1 = AccessLogin(OBJ_2, 정보종류)</RUN>
+			<EXAMPLE>... refers to login information from ... </EXAMPLE>
+		</Patterns>
+
+	</Verb>
+
+	<Verb>
+		<VERBID>apply</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>A + then + V + to OBJ_1</CHAR>
+			<RUN>OBJ_1 = A</RUN>
+			<EXAMPLE>(...) then apply to ... </EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>Initialize</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1.ReadyToProgress</RUN>
+			<EXAMPLE>Initialize ... </EXAMPLE>
+			<HELP_EX>Initialize @progressbar</HELP_EX>
+		</Patterns>
+	</Verb>	
+	
+	<Verb>
+		<VERBID>set</VERBID>
+		<TENSE>, setting, set</TENSE>			
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1 = true</RUN>
+			<EXAMPLE>Set ... </EXAMPLE>
+			<HELP_EX>Set the @atom's @property</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + model + location + to(위치)</CHAR>
+			<RUN>Model.StartPosition(위치)</RUN>
+			<EXAMPLE>Set model location to(...) </EXAMPLE>
+			<HELP_EX>Set model location to(@가로, @세로)</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + model + size + to(크기)</CHAR>
+			<RUN>Model.SetSize(크기)</RUN>
+			<EXAMPLE>Set model size to(...) </EXAMPLE>
+			<HELP_EX>Set model size to(@너비, @높이)</HELP_EX>
+		</Patterns>
+	</Verb>
+	
+	<Verb>
+		<VERBID>execute</VERBID>
+		<TENSE>executes, executting, executed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 </CHAR>
+			<RUN>OBJ_1</RUN>
+			<EXAMPLE>execute ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>V + DB_Operator(객체명)</CHAR>
+			<RUN>DB처리문실행(객체명)</RUN>
+			<EXAMPLE>execute DB_Operator(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + V + paragraph(문단명)</CHAR>
+			<RUN>문단명(P)</RUN>
+			<EXAMPLE>(giving param) execute paragraph(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + paragraph(문단명) + P</CHAR>
+			<RUN>문단명(P)</RUN>
+			<EXAMPLE>execute paragraph(...) giving param</EXAMPLE>
+		</Patterns>	
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + by predetermined + interval</CHAR>
+			<RUN>OBJ_1.Increment</RUN>
+			<EXAMPLE>Execute [OBJECT] by predetermined interval</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + V + OBJ_1</CHAR>
+			<RUN>OBJ_1(P)</RUN>
+			<EXAMPLE>(giving param) execute ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>C + then + V + paragraph + repeatedly</CHAR>
+			<RUN>반복 (C) \n paragraph</RUN>
+			<EXAMPLE>(condition) then Execute this paragraph repeatedly</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>C + V + paragraph + repeatedly</CHAR>
+			<RUN>반복 (C) \n paragraph</RUN>
+			<EXAMPLE>(condition) Execute this paragraph repeatedly</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>V + paragraph + repeatedly + for OBJ_1 + times/time</CHAR>
+			<RUN>반복 (OBJ_1) \n paragraph</RUN>
+			<EXAMPLE>Execute this paragraph repeatedly for ... times</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>IF</GR_TYPE>
+			<CHAR>C + then + V + paragraph</CHAR>
+			<RUN>만일 (C) \n paragraph</RUN>
+			<EXAMPLE>(condition) then Execute paragraph </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>IF</GR_TYPE>
+			<CHAR>C + V + paragraph</CHAR>
+			<RUN>만일 (C) \n paragraph</RUN>
+			<EXAMPLE>(condition) Execute paragraph </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>FUNC</GR_TYPE>
+			<CHAR>F + V + paragraph(인자)</CHAR>
+			<RUN>함수 F(인자)</RUN>
+			<EXAMPLE>(When Envent is occurred) Execute this paragraph</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>V + paragraph(문단) + repeatedly</CHAR>
+			<RUN>반복 (true) \n 문단</RUN>
+			<EXAMPLE>execute this paragraph repeatedly</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + OBJ_1 + V:be-ed + from model</CHAR>
+			<RUN>Form_SelPopupMenuItem</RUN>
+			<EXAMPLE>If PopupMenu is executed from the model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + timerevent + V:be-ed</CHAR>
+			<RUN>Form_Timer</RUN>
+			<EXAMPLE>If timerevent is executed</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + PopupMenu + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _SelPopupMenuItem</RUN>
+			<EXAMPLE>If PopupMenu is executed from ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>17</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + bizlogic + V:be-ed </CHAR>
+			<RUN>GlobalScript_Open</RUN>
+			<EXAMPLE>If bizlogic is executed</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>18</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + program(프로그램명)</CHAR>
+			<RUN>ProgramExecution(프로그램명)</RUN>
+			<EXAMPLE>Execute program(…)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>19</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + function + from OBJ_2</CHAR>
+			<RUN>OBJ_2.OBJ_1</RUN>
+			<EXAMPLE>Execute ... function from [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>20</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + showhide </CHAR>
+			<RUN>Model.F9Toggle</RUN>
+			<EXAMPLE>Execute showhide</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>21</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + paragraph(문단명)</CHAR>
+			<RUN>문단명</RUN>
+			<EXAMPLE>execute paragraph(...)</EXAMPLE>
+		</Patterns>	
+	</Verb>
+
+	<Verb> 
+		<VERBID>Show</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + sentence(문장) + on screen(종류)</CHAR>
+			<RUN>answer = MsgBox(문장, 종류)</RUN>
+			<EXAMPLE>Show sentence(...) on the screen('pqOKOnly','pqInformation')</EXAMPLE>
+			<SHOW></SHOW>
+			<KEYWORD>메시지표시</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + OBJ_1 + on screen(종류))</CHAR>
+			<RUN>answer = MsgBox(OBJ_1, 종류)</RUN>
+			<EXAMPLE>Show ... on the screen('pqOKOnly','pqInformation')</EXAMPLE>
+			<SHOW>false</SHOW>
+			<KEYWORD>메시지표시</KEYWORD>
+		</Patterns>
+	
+	</Verb>
+	
+	<Verb>
+		<VERBID>Arrange</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>V + DB_Operator(객체명)</CHAR>
+			<RUN>DB처리문준비 (객체명)</RUN>
+			<EXAMPLE>Arrange DB_Operator(...)</EXAMPLE> 
+			<KEYWORD>DB처리문</KEYWORD>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>Commit</VERBID>
+		<TENSE>Commit, Committing, Committed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>Before + V:-ing + transaction</CHAR>
+			<RUN>Form_Saved</RUN>
+			<EXAMPLE>Before committing the transaction</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>After + V:-ing + transaction</CHAR>
+			<RUN>Form_SavedComplete</RUN>
+			<EXAMPLE>After committing the transaction</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + DB + Control</CHAR>
+			<RUN>TransactionMessage(1)</RUN>
+			<EXAMPLE>Commit DB Control</EXAMPLE>
+		</Patterns>
+
+	</Verb>	
+
+	<Verb>
+		<VERBID>Replace</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + OBJ_1 + with OBJ_2</CHAR>
+			<RUN>OBJ_1 = OBJ_2</RUN>
+			<EXAMPLE>Replace ... with ...</EXAMPLE>
+		</Patterns>
+	</Verb>
+	
+	<Verb>
+		<VERBID>Move</VERBID>
+		<TENSE>,,moved</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>V + to top + of paragraph</CHAR>
+			<RUN>계속</RUN>
+			<EXAMPLE>Move to top of paragraph</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + focus + to OBJ_1</CHAR>
+			<RUN>OBJ_1.GiveFocus()</RUN>
+			<EXAMPLE>Move focus to [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + by position(위치)</CHAR>
+			<RUN>OBJ_1.Move(위치)</RUN>
+			<EXAMPLE>Move [OBJECT] by position(..., ...)</EXAMPLE>
+			<KEYWORD></KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + tab + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _TabKeyDown</RUN>
+			<EXAMPLE>If tab is moved from ...</EXAMPLE>
+		</Patterns>	
+	</Verb>
+
+	<Verb>
+		<VERBID>give</VERBID>
+		<TENSE>, giving,</TENSE>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>PARAM</GR_TYPE>
+			<CHAR>V:-ing + OBJ_1</CHAR>
+			<RUN>OBJ_1</RUN>
+			<EXAMPLE>giving ...</EXAMPLE>
+		</Patterns>
+	</Verb>	
+	
+	<Verb>
+		<VERBID>gain</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + focus</CHAR>
+			<RUN>OBJ_1 _SetFocus</RUN>
+			<EXAMPLE>If ... gain focus</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>lose</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + OBJ_1 + V + focus</CHAR>
+			<RUN>OBJ_1 _KillFocus</RUN>
+			<EXAMPLE>If ... lose focus</EXAMPLE>
+		</Patterns>
+	</Verb>	
+	
+	<Verb>
+		<VERBID>stop</VERBID>
+		<TENSE>,,</TENSE>
+		
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + stopwatch(제목)</CHAR>
+			<RUN>MeasureTime('pqAbort', 제목)</RUN>
+			<EXAMPLE>Stop stopwatch(...)</EXAMPLE>
+		</Patterns>	
+	</Verb>
+	
+	<Verb>
+		<VERBID>Cancel</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1 = false</RUN>
+			<EXAMPLE>Cancel ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>V + paragraph</CHAR>
+			<RUN>실행취소</RUN>
+			<EXAMPLE>Cancel paragraph</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + DB + control</CHAR>
+			<RUN>TransactionMessage(0)</RUN>
+			<EXAMPLE>Cancel DB control</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + timerevent(번호) + for model</CHAR>
+			<RUN>Model.SetTimer('pqRelease', 번호)</RUN>
+			<EXAMPLE>Cancel timerevent(...) for model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + UserMessage + for OBJ_1</CHAR>
+			<RUN>OBJ_1.UserMsg(false)</RUN>
+			<EXAMPLE>Cancel UserMessage for [OBJECT]</EXAMPLE>
+		</Patterns>
+
+	</Verb>
+	
+	<Verb>
+		<VERBID>Turn</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + on OBJ_1</CHAR>
+			<RUN>OBJ_1 = true</RUN>
+			<EXAMPLE>turn on ...</EXAMPLE>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + off OBJ_1</CHAR>
+			<RUN>OBJ_1 = false</RUN>
+			<EXAMPLE>turn off ...</EXAMPLE>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>Check</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1 = true</RUN>
+			<EXAMPLE>Check ... </EXAMPLE>
+			<RESULT></RESULT>
+			<KEYWORD></KEYWORD>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>meet</VERBID>
+		<TENSE>, , met</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>if + condition(조건) + V:be-ed</CHAR>
+			<RUN>condition</RUN>
+			<EXAMPLE>If the condition(...) is met</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>delete</VERBID>
+		<TENSE>, ,deleted</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + all + in OBJ_1</CHAR>
+			<RUN>OBJ_1.RemoveAll</RUN>
+			<EXAMPLE>Delete all in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + row(행번호) + in OBJ_1</CHAR>
+			<RUN>OBJ_1.RemoveAt(행번호)</RUN>
+			<EXAMPLE>Delete row(...) in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + row(행번호) + in OBJ_1:CScrollable/CDBGridEx/CTree</CHAR>
+			<RUN>OBJ_1.DeleteItems(행번호)</RUN>
+			<EXAMPLE>Delete row(...) in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + column + in OBJ_1</CHAR>
+			<RUN>OBJ_1.DeleteColumn()</RUN>
+			<EXAMPLE>Delete column(...) in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + PopupMenu(메뉴번호) + in OBJ_1</CHAR>
+			<RUN>OBJ_1.DeleteMenu(메뉴번호)</RUN>
+			<EXAMPLE>Delete PopupMenu(...) in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + row + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _DeleteRow</RUN>
+			<EXAMPLE>If row is deleted from [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + column  + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _DeleteColumn</RUN>
+			<EXAMPLE>If column is deleted from ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + data + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _DeleteBar</RUN>
+			<EXAMPLE>If data is deleted from ...</EXAMPLE>
+		</Patterns>
+	</Verb>	
+	
+	<Verb>
+		<VERBID>Click</VERBID>
+		<TENSE>, , Clicked</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>when + OBJ_1 + V:be-ed</CHAR>
+			<RUN>OBJ_1 _Click</RUN>
+			<EXAMPLE>when ... is clicked</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>round</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + up OBJ_1 + to(위치)</CHAR>
+			<RUN>OBJ_1.Decimal(위치, 'pqRound')</RUN>
+			<EXAMPLE>Round up [OBJECT] to(…)</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>print</VERBID>
+		<TENSE>,,printed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + model + V:be-ed</CHAR>
+			<RUN>폼_출력</RUN>
+			<EXAMPLE>If model is printed</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>After + documentmodel + V:be-ed</CHAR>
+			<RUN>Form_PrintedDocument</RUN>
+			<EXAMPLE>After documentmodel is printed</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + documentmodel + V:be-ed + from child_model</CHAR>
+			<RUN>ChildForm_Print</RUN>
+			<EXAMPLE>If documentmodel is printed from child_model</EXAMPLE>
+		</Patterns>
+
+	</Verb>
+
+	<Verb>
+		<VERBID>Compute</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + formula + in OBJ_1</CHAR>
+			<RUN>OBJ_1.OperationExecution</RUN>
+			<EXAMPLE>Compute formula in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + formula(식)</CHAR>
+			<RUN>식</RUN>
+			<EXAMPLE>Compute formula(...) </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + dateformula(날짜)</CHAR>
+			<RUN>DateDiff(날짜)</RUN>
+			<EXAMPLE>Compute dateformula(...) </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + timeformula(시간)</CHAR>
+			<RUN>TimeDiff(시간)</RUN>
+			<EXAMPLE>Compute timeformula(...) </EXAMPLE>
+		</Patterns>
+	</Verb>	
+
+	<Verb>
+		<VERBID>Select</VERBID>
+		<TENSE>,,Selected</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + menu + V:be-ed</CHAR>
+			<RUN>GlobalScript_SelMenuItem</RUN>
+			<EXAMPLE>if menu is selected</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + forwarddraft + V:be-ed + from child_model</CHAR>
+			<RUN>ChildForm_ReplyDrafting</RUN>
+			<EXAMPLE>If forwarddraft is selected from child_model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + item + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _SelectDocument</RUN>
+			<EXAMPLE>If an item is selected from ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + file + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _FileOpen</RUN>
+			<EXAMPLE>If file is selected from ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + data + V:be-ed + from OBJ_1</CHAR>
+			<RUN>OBJ_1 _PopupCompleted</RUN>
+			<EXAMPLE>If a data is selected from ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + tab + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _ChangingTabView</RUN>
+			<EXAMPLE>If tab is selected in D</EXAMPLE>
+		</Patterns>
+	</Verb>	
+
+	<Verb>
+		<VERBID>open</VERBID>
+		<TENSE>opens,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + model + on path(경로)</CHAR>
+			<RUN>child_model = CreateObject('pqForm', 경로)</RUN>
+			<EXAMPLE>open the model on the path(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + model + on path(경로) + with priority</CHAR>
+			<RUN>child_model = CreateObject('pqForm', 경로, 'pqPriority')</RUN>
+			<EXAMPLE>open the model on the path(...) with priority</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + model + on path(경로) + with hideoption</CHAR>
+			<RUN>child_model = CreateObject('pqForm', 경로, 'pqHide')</RUN>
+			<EXAMPLE>open the model on the path(...) with hideoption</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>V + BizLogic + on path(경로)</CHAR>
+			<RUN>global_script = CreateObject('pqScript', 경로)</RUN>
+			<EXAMPLE>open BizLogic on path(...)</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + popupmenu + in OBJ_1</CHAR>
+			<RUN>OBJ_1.PopupExecution</RUN>
+			<EXAMPLE>Open popupmenu in [OBJECT]</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + report(내용) + in path(경로)</CHAR>
+			<RUN>ShowReport2(경로, 내용)</RUN>
+			<EXAMPLE>Open report(...) in path(...)</EXAMPLE>
+		</Patterns>
+		
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + report(내용) + in path(경로) + by condition(조건)</CHAR>
+			<RUN>ShowReport2(경로, 조건)</RUN>
+			<EXAMPLE>Open report(...) in path(...) by condition(...)</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>when + model + V</CHAR>
+			<RUN>Form_Open</RUN>
+			<EXAMPLE>when model opens</EXAMPLE>
+		</Patterns>	
+
+	</Verb>
+
+	<Verb>
+		<VERBID>search</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + for OBJ_1 + in OBJ_2</CHAR>
+			<RUN>OBJ_2.Find(OBJ_1)</RUN>
+			<EXAMPLE>Search for ... in [OBJECT]</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>hide</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + column + from OBJ_1</CHAR>
+			<RUN>OBJ_1.SelectChangeItem(column(), 'pqHide')</RUN>
+			<EXAMPLE>hide column(...) from [OBJECT]</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>Encrypt </VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1(조건)</CHAR>
+			<RUN>Encrypt('pqEncrypt', OBJ_1, 조건)</RUN>
+			<EXAMPLE>Encrypt ...(..., ...)</EXAMPLE>
+		</Patterns>
+
+	</Verb>
+
+	<Verb>
+		<VERBID>Decrypt</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1(조건)</CHAR>
+			<RUN>Encrypt('pqDecrypt', OBJ_1, 조건)</RUN>
+			<EXAMPLE>Decrypt ...(..., ...)</EXAMPLE>
+		</Patterns>
+
+	</Verb>
+
+	<Verb>
+		<VERBID>change</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into float</CHAR>
+			<RUN>OBJ_1.IP0.ToDouble</RUN>
+			<EXAMPLE>Change [OBJECT] into float</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into int</CHAR>
+			<RUN>OBJ_1.IP0.ToInt</RUN>
+			<EXAMPLE>Change [OBJECT] into int</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into char</CHAR>
+			<RUN>OBJ_1.IP0.ToChar</RUN>
+			<EXAMPLE>Change [OBJECT] into char</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + cursor + to OBJ_1</CHAR>
+			<RUN>SetCursor(OBJ_1)</RUN>
+			<EXAMPLE>Change cursor to ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + to OBJ_2 + from OBJ_3</CHAR>
+			<RUN>OBJ_3.IP0.Replace(OBJ_1, OBJ_2)</RUN>
+			<EXAMPLE>Change ... to ... from [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into uppercase</CHAR>
+			<RUN>OBJ_1.IP0.UpperCase()</RUN>
+			<EXAMPLE>Change [OBJECT]into uppercase</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into lowercase</CHAR>
+			<RUN>OBJ_1.IP0.LowerCase()</RUN>
+			<EXAMPLE>Change [OBJECT]into lowercase</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + item + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _SelChanged</RUN>
+			<EXAMPLE>If an item is changed in ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>after + item + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _SelChangeCompleted</RUN>
+			<EXAMPLE>After item is changed in ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + to OBJ_2 + from DB_Operator(객체명)</CHAR>
+			<RUN>Model.ModifySQLObject(객체명, OBJ_1, false, OBJ_2)</RUN>
+			<EXAMPLE>Change ... to ... from DB_Operator(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>If + menu + V:be-ed</CHAR>
+			<RUN>GlobalScript_ChangeMenu</RUN>
+			<EXAMPLE>If menu is changed</EXAMPLE>
+		</Patterns>	
+	</Verb>
+
+	<Verb>
+		<VERBID>disconnect</VERBID>
+		<TENSE>, , disconnectted</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1.Close()</RUN>
+			<EXAMPLE>Disconnect [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + user + V:be-ed + from server</CHAR>
+			<RUN>GlobalScript_Disconnect</RUN>
+			<EXAMPLE>If user is disconnected from server</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+
+	<Verb>
+		<VERBID>connect</VERBID>
+		<TENSE>, , connected</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + user + V:be-ed + to globalserver</CHAR>
+			<RUN>GlobalScript_ConnectServer</RUN>
+			<EXAMPLE>If user connected to globalserver</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>close</VERBID>
+		<TENSE>, , closed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1</CHAR>
+			<RUN>OBJ_1.Close</RUN>
+			<EXAMPLE>close [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>when + model + V:be-ed</CHAR>
+			<RUN>Form_Close</RUN>
+			<EXAMPLE>when model is closed</EXAMPLE>
+		</Patterns>	
+	</Verb>
+
+	<Verb>
+		<VERBID>start</VERBID>
+		<TENSE>,,</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + stopwatch</CHAR>
+			<RUN>MeasureTime('pqStart')</RUN>
+			<EXAMPLE>Start stopwatch</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>increase</VERBID>
+		<TENSE>, ,increased</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + OBJ_1 + V:be-ed + automatically</CHAR>
+			<RUN>OBJ_1 _AutoIncrement</RUN>
+			<EXAMPLE>if ... is increased automatically</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>make</VERBID>
+		<TENSE>, ,made</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>If + entry + V:be-ed + by popup + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _ShowPopup</RUN>
+			<EXAMPLE>If the entry is made by popup in ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>before + sanction + V:be-ed</CHAR>
+			<RUN>Form_sanctionCall</RUN>
+			<EXAMPLE>Before sanction is made</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>after + sanction + V:be-ed</CHAR>
+			<RUN>Form_DocumentLedger</RUN>
+			<EXAMPLE>After sanction is made</EXAMPLE>
+		</Patterns>
+
+	</Verb>
+
+	<Verb>
+		<VERBID>save</VERBID>
+		<TENSE>, ,saved</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>If + DocumentModel + V:be-ed + as file</CHAR>
+			<RUN>Form_CopiedDocument</RUN>
+			<EXAMPLE>If DocumentModel is saved as a file</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>If + DocumentModel + V:be-ed + as file + from child_model</CHAR>
+			<RUN>ChildForm_FileSave</RUN>
+			<EXAMPLE>If DocumentModel is saved as a file from child_model</EXAMPLE>
+		</Patterns>
+	</Verb>	
+
+	<Verb>
+		<VERBID>complete</VERBID>
+		<TENSE>, completing, completed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>After + V:-ing + V + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _Loaded</RUN>
+			<EXAMPLE>After completing search in ...</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>After + V:-ing + V + in model</CHAR>
+			<RUN>Form_Loaded</RUN>
+			<EXAMPLE>After completing search in model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>If + entry + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _SetBar</RUN>
+			<EXAMPLE>If the entry is completed in ...,</EXAMPLE>
+		</Patterns>	
+	</Verb>
+
+	<Verb>
+		<VERBID>call</VERBID>
+		<TENSE>,,called</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>when + model + V:be-ed + as child_model</CHAR>
+			<RUN>Form_OpenAsChild</RUN>
+			<EXAMPLE>When model is called as child_model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + documentmodel + V:be-ed</CHAR>
+			<RUN>폼_호출</RUN>
+			<EXAMPLE>If documentmodel is called</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>press</VERBID>
+		<TENSE>,,pressed</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + keyboard + V:be-ed + in model</CHAR>
+			<RUN>Form_NodifyKey</RUN>
+			<EXAMPLE>If keyboard is pressed in model</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + keyboard + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _NotifyKey</RUN>
+			<EXAMPLE>If keyboard is pressed in ... </EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + functionkey  + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _KeyDown</RUN>
+			<EXAMPLE>If functionkey  is pressed in ...</EXAMPLE>
+		</Patterns>
+
+	</Verb>	
+
+	<Verb>
+		<VERBID>exit</VERBID>
+		<TENSE>, , exit</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>V + paragraph</CHAR>
+			<RUN>종료</RUN>
+			<EXAMPLE>exit paragraph</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>V + loop</CHAR>
+			<RUN>빠짐</RUN>
+			<EXAMPLE>exit loop</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+	<Verb>
+		<VERBID>Add</VERBID>
+		<TENSE>, ,added</TENSE>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into OBJ_2 + as row(행번호)</CHAR>
+			<RUN>OBJ_2.Add(행번호, OBJ_1)</RUN>
+			<EXAMPLE>Add ... into [OBJECT] as a row(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into OBJ_2:CBrowse/CReportBrowse/CTree + as row(행번호)</CHAR>
+			<RUN>OBJ_2.AddItems(행번호, OBJ_1)</RUN>
+			<EXAMPLE>Add ... into [OBJECT] as a row(...)</EXAMPLE>
+		</Patterns>
+
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + row(행번호) + into OBJ_1</CHAR>
+			<RUN>OBJ_1.AddItems(행번호)</RUN>
+			<EXAMPLE>Add row(...) into [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + OBJ_1 + into OBJ_2 + as column(열번호)</CHAR>
+			<RUN>OBJ_2.InsertColumn(열번호, OBJ_1)</RUN>
+			<EXAMPLE>Add ... into [OBJECT] as a column(...)</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>V + PopupMenu(번호) + in OBJ_1</CHAR>
+			<RUN>OBJ_1.AddMenu(번호)</RUN>
+			<EXAMPLE>Add PopupMenu(...) in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + row + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _InsertRow</RUN>
+			<EXAMPLE>If row is added in [OBJECT]</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>if + column + V:be-ed + in OBJ_1</CHAR>
+			<RUN>OBJ_1 _AddColumn</RUN>
+			<EXAMPLE> If column is added in [OBJECT]</EXAMPLE>
+		</Patterns>
+	</Verb>
+
+</VerbDic>

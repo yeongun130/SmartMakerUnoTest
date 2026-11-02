@@ -1,0 +1,3567 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="verbdic.xsl" ?>
+
+<!--
+// 자연어로 작성한 스크립트를 기호식 스크립트로 변환하는 것 지원 예정
+//사전은 별도로 Serialize 시켜서 구동시에 사전정보 생성에 드는 시간을 절약하자..
+//인덱스화시켜도 무방한 함수 또는 속성들에 대해서는 인덱스화 시켜서 저장하므로써 
+//컴파일 시간을 절약한다.
+//
+//사전파일을 생성할 때, 구조의 길이가 가장 긴것을 먼저 넣고, 다음은 조건이 있는 것을 먼저 넣는다.
+
+1. 조사의 종류
+ 은/는 : S   (주격조사 Subject) 
+ 이/가 : H   (보격조사 Help)
+ 을/를 : O   (목적격조사 Object)
+ 이라는/라는 : D (지칭조사 Designate)
+ 의 : B  (by)
+ 에 : N  (on)
+ 에서 : I (IN)
+ 로/으로 : W (with)
+ 보다 : T (than)
+ 서술어  : V (Verb)
+ 가짜서술어 : X  - 동사형태지만 서술어역활을 하지 않는 동사
+ 파라메터문장 : P (Parameter)
+ 조건문장 : C  (Condition)
+ 이벤트 : F (Function Event)
+ 커서   : R (CURSOR)  -> 프로시저에서 사용
+ 문장 : A  
+ 그외 : E (etc)
+
+//CPatternAnal.COMPONENT 및 COMP_TYPE 과 연결, 
+//A, B, C, D, E, F, H, I, K, N, O, P, R, S, T, V, W, X
+
+2. XML 요소의 구성
+	 <ID>				: 패턴 고유번호 - 서술어별로 매겨지며 불변이다. 이 고유번호는 팝업메뉴의 우선순위 설정에 사용된다.
+	 <GR_TYPE>	: 문장의 종류를 판단한다. 대입문인지.. 함수인지.. 반복문인지 등등..
+   <CHAR>			: 문장의 패턴을 나타낸다. 문장성분의 조합, 주어+목적어+서술어 = S + O + V
+	 <RUN>			: 기호식 스크립트의 문법을 나타낸다. 사전정보를 만들 때 참고하므로 함부로 바꾸면 안 된다
+	 <COND>			: 조건 및 문장에 꼭 필요한 예약어이다 문장성분의 위치와 일치해야 한다.
+	 <EXAMPLE>	: 자연어 스크립트 예문이다.
+	 <HELP_EX>	: 파라메터에 대한 명칭이 붙어있는 예문이다. 추후 기능개선이 필요할 듯 하여 Example과 분리한 상태, Dic에는 HELP_EX우선 저장된다.
+	 <SHOW>			: FALSE이면 PopupHelp에 보이지 않는다, 지향하지 않는 문법, 여러가지 중복되는 문법 등을 사용자에게 보이지 않기 위해
+	 <RESULT>		: 함수가 실행한 후 반환값 (현재 사용 안함) 
+	 <KEYWORD>	: 편집기에서 F1을 눌렀을 때 Html Help에서 검색할 검색어
+
+3. XML 요소의 해석
+		<Patterns>
+			<ID>1</ID>											-> '표시하다' 에서 ID 1
+			<GR_TYPE>EXPR</GR_TYPE>         ->  문장종류 : 연산식
+			<CHAR>O + N + V</CHAR>          ->  문장성분 : 목적어+...에+서술어 
+			<RUN>메시지(OP, VP)</RUN>       ->  기호식으로 변경했을 때의 문법
+			<COND>문장, 화면</COND>         ->  목적어의 체언은 '문장', '...에'의 체언은 화면
+			<EXAMPLE>문장(...)를 화면에 표시한다('예아니오', '질문').</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+
+4. 문장성분의 해석
+ OP, A1P 처럼 알파벳 또는 숫자 조합의 해석 
+ 첫번째 문자 : 문장성분의 종류
+ 두번째 숫자 : 예약어에서 몇번째 문장성분이냐.. (Zero base)
+ 두번째 또는 세번째 문자 : 첫번째 문장 성분의 파라메터 (예를 들어 "검색창(1,2)의 항목크기"에서 (1,2)의 정보가 된다
+
+5. 기타
+[OBJECT] : 아톰만 들어가는 곳, 아톰에 제한적인 실행문을 필터링하기 위해
+
+-->
+<VerbDic>
+	<Verb>
+		<VERBID>-이</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + V</CHAR>
+			<RUN>H = V</RUN>
+			<COND />
+			<EXAMPLE>...가 ...이면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>,,이상</COND>
+			<EXAMPLE>...가 ... 이상이면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>,,이하</COND>
+			<EXAMPLE>...가 ... 이하이면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt; E</RUN>
+			<COND>,,미만</COND>
+			<EXAMPLE>...가 ... 미만이면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &gt; E</RUN>
+			<COND>,,초과</COND>
+			<EXAMPLE>...가 ... 초과이면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V + E</CHAR>
+			<RUN>V</RUN>
+			<COND>조건, 경우</COND>
+			<EXAMPLE>조건(...)인 경우</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V</CHAR>
+			<RUN>V</RUN>
+			<COND>조건</COND>
+			<EXAMPLE>조건(...)이면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + V</CHAR>
+			<RUN>S = V</RUN>
+			<COND />
+			<EXAMPLE>...는 ...이다</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>참조ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + O + V</CHAR>
+			<RUN>S = O</RUN>
+			<COND />
+			<EXAMPLE>...는 ...을 참조한다</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S = O</RUN>
+			<COND>,,모두</COND>
+			<EXAMPLE>...는 ...을 모두 참조한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + A + V</CHAR>
+			<RUN>S = A</RUN>
+			<COND />
+			<EXAMPLE>...는 (입력란.값을 정수로 변경해서) 참조한다</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>PARAM</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND />
+			<EXAMPLE>...을 참조해서</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + B + O + E + V</CHAR>
+			<RUN>S = B(반복횟수, O)</RUN>
+			<COND>,,,순서대로</COND>
+			<EXAMPLE>...는 ...의 ...을 순서대로 참조한다</EXAMPLE>
+			<HELP_EX>...는 @배열의 @열이름을 순서대로 참조한다</HELP_EX>
+			<KEYWORD>순서대로</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S = O(반복횟수)</RUN>
+			<COND>,,순서대로</COND>
+			<EXAMPLE>...는 ...을 순서대로 참조한다</EXAMPLE>
+			<HELP_EX>...는 @배열을 순서대로 참조한다</HELP_EX>
+			<KEYWORD>순서대로</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>S + O + E + V</CHAR>
+			<RUN>S.추가대입(O)</RUN>
+			<COND>,,추가로</COND>
+			<EXAMPLE>...는 ...을 추가로 참조한다.</EXAMPLE>
+			<HELP_EX>...는 @배열을 추가로 참조한다.</HELP_EX>
+			<KEYWORD>추가대입</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>S + B + O + V</CHAR>
+			<RUN>S = 접속정보(B, OP)</RUN>
+			<COND>,,접속정보</COND>
+			<EXAMPLE>...는 ...의 접속정보(...)를 참조한다.</EXAMPLE>
+			<HELP_EX>...는 @부문명의 접속정보(@구분상수)를 참조한다.</HELP_EX>
+			<KEYWORD>접속정보</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + E + O + V</CHAR>
+			<RUN>S = E</RUN>
+			<COND>,,여부</COND>
+			<EXAMPLE>...는 @속성 여부을 참조한다.</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>ASSIGN</GR_TYPE>
+      <CHAR>S + E + O + V</CHAR>
+      <RUN>S = E</RUN>
+      <COND>,,폼을 참조한다.</COND>
+    </Patterns>
+    <Patterns>
+      <ID>11</ID>
+      <GR_TYPE>ASSIGNEX</GR_TYPE>
+      <CHAR>S + B + O + V</CHAR>
+      <RUN>S = 아톰변수(0, BP, O, OP)</RUN>
+      <COND>,아톰변수</COND>
+      <EXAMPLE>...는 아톰변수(@아톰명)의 @속성을 참조한다.</EXAMPLE>
+    <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>12</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + S + O + V</CHAR>
+      <RUN>아톰변수(1, BP, S, SP, O)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...은 ...을 참조한다.</EXAMPLE>
+    <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+  
+	</Verb>
+	<Verb>
+		<VERBID>대입ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N = O</RUN>
+			<COND />
+			<EXAMPLE>...에 ...를 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N = O</RUN>
+			<COND>,,모두</COND>
+			<EXAMPLE>...에 ...를 모두 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + A + V</CHAR>
+			<RUN>N = A</RUN>
+			<COND />
+			<EXAMPLE>...에 (관리번호를 변경해서) 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>N + B + O + E + V</CHAR>
+			<RUN>N = B(반복횟수, O)</RUN>
+			<COND>,,,순서대로</COND>
+			<EXAMPLE>...에 ...의 ...을 순서대로 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>순서대로</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>ASSIGNEX</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N = O(반복횟수)</RUN>
+			<COND>,,순서대로</COND>
+			<EXAMPLE>...에 ...을 순서대로 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>순서대로</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + E + V</CHAR>
+			<RUN>N.추가대입(O)</RUN>
+			<COND>,,추가로</COND>
+			<EXAMPLE>[OBJECT]에 ...을 추가로 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>추가대입</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>N + E + O + V</CHAR>
+			<RUN>N = E</RUN>
+			<COND>,,여부</COND>
+			<EXAMPLE>...에 ... 여부을 대입한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>ASSIGNEX</GR_TYPE>
+      <CHAR>N + B + O + V</CHAR>
+      <RUN>N = 아톰변수(0, BP, O, OP)</RUN>
+      <COND>,아톰변수</COND>
+      <EXAMPLE>...에 아톰변수(@아톰명)의 @속성을 대입한다.</EXAMPLE>
+      <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + N + O + V</CHAR>
+      <RUN>아톰변수(1, BP, N, NP, O)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...에 ...을 대입한다.</EXAMPLE>
+      <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>설정ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>S + W + V</CHAR>
+			<RUN>S = W</RUN>
+			<COND />
+			<EXAMPLE>...는 ...으로 설정한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O = W</RUN>
+			<COND />
+			<EXAMPLE>...를 ...으로 설정한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 참</RUN>
+			<COND />
+			<EXAMPLE>...을 설정한다.</EXAMPLE>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 참</RUN>
+			<COND>, 속성</COND>
+			<EXAMPLE>... 속성을 설정한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.진행준비</RUN>
+			<COND>,처음상태</COND>
+			<EXAMPLE>[OBJECT]을 처음상태로 설정한다.</EXAMPLE>
+			<KEYWORD>진행준비</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>파일지정(OP)</RUN>
+			<COND>파일</COND>
+			<EXAMPLE>파일(...)을 설정한다.</EXAMPLE>
+			<HELP_EX>파일(@구분상수, @확장자리스트, @기본확장자)을 설정한다.</HELP_EX>
+			<RESULT>선택된파일</RESULT>
+			<KEYWORD>파일지정</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼.시간이벤트('설정', OP)</RUN>
+			<COND>폼,시간이벤트,</COND>
+			<EXAMPLE>폼의 시간이벤트(...)를 설정한다.</EXAMPLE>
+			<HELP_EX>폼의 시간이벤트(@이벤트번호, @실행간격)를 설정한다.</HELP_EX>
+			<KEYWORD>시간이벤트설정</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>B.사용자메시지(참, W)</RUN>
+			<COND>,안내문장,</COND>
+			<EXAMPLE>[OBJECT]의 안내문장을 ....로 설정한다.</EXAMPLE>
+			<KEYWORD>사용자메시지</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼.시작위치(OP)</RUN>
+			<COND>폼, 시작위치</COND>
+			<EXAMPLE>폼의 시작위치(..., ...)를 설정한다.</EXAMPLE>
+			<HELP_EX>폼의 시작위치(@X좌표, @Y좌표)를 설정한다.</HELP_EX>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼.크기변경(OP)</RUN>
+			<COND>폼, 크기</COND>
+			<EXAMPLE>폼의 크기(.., ...)를 설정한다.</EXAMPLE>
+			<HELP_EX>폼의 크기(@가로, @세로)를 설정한다.</HELP_EX>
+		</Patterns>
+		 <Patterns>
+		  <ID>11</ID>
+		  <GR_TYPE>EXPR</GR_TYPE>
+		  <CHAR>B + O + W + V</CHAR>
+		  <RUN>폼.페이지설정(W)</RUN>
+		  <COND>폼, 페이지,</COND>
+		  <EXAMPLE>폼의 페이지를 ...로 설정한다.</EXAMPLE>
+		  <KEYWORD>페이지설정</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>12</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.네비게이션바('설정')</RUN>
+      <COND>폼,네비게이션바</COND>
+      <EXAMPLE>폼의 네비게이션바를 설정한다.</EXAMPLE>
+      <KEYWORD>네비게이션바설정</KEYWORD>
+    </Patterns>
+  <Patterns>
+      <ID>13</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>아톰변수(1, BP, O, OP, 참)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...를 설정한다.</EXAMPLE>
+      <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>14</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + W + V</CHAR>
+      <RUN>아톰변수(1, BP, O, OP, W)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...를 ...로 설정한다.</EXAMPLE>
+      <KEYWORD>아톰변수</KEYWORD>
+    </Patterns>
+    <Patterns> 
+      <ID>15</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>알람기능('설정', OP)</RUN>
+      <COND>알람기능</COND>
+      <EXAMPLE>알람기능을 설정한다..</EXAMPLE>
+      <KEYWORD>알람기능</KEYWORD>
+    </Patterns>  
+  		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폴더권한(OP)</RUN>
+			<COND>폴더권한</COND>
+			<EXAMPLE>폴더권한(...)을 설정한다.</EXAMPLE>
+			<KEYWORD>폴더권한</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>17</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.시간이벤트('설정', OP)</RUN>
+      <COND>서비스,시간이벤트,</COND>
+      <EXAMPLE>서비스의 시간이벤트(...)를 설정한다.</EXAMPLE>
+      <HELP_EX>서비스의 시간이벤트(@이벤트번호, @실행간격)를 설정한다.</HELP_EX>
+      <KEYWORD>시간이벤트설정</KEYWORD>
+    </Patterns>
+  </Verb>
+  
+	<Verb>
+		<VERBID>진행ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + E + V</CHAR>
+			<RUN>O.진행</RUN>
+			<COND>,설정, 간격</COND>
+			<EXAMPLE>[OBJECT]을 설정 간격만큼 진행한다</EXAMPLE>
+			<KEYWORD>진행표시란진행</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>정의ㅎ</VERBID>
+	</Verb>
+	<Verb>
+		<VERBID>실행ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>객체생성('폼', BP, OP)</RUN>
+			<COND>경로, 폼</COND>
+			<EXAMPLE>경로(...)의 폼을 실행한다.</EXAMPLE>
+			<KEYWORD>자식폼실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + E + V</CHAR>
+			<RUN>객체생성('폼', BP, '우선실행', OP)</RUN>
+			<COND>경로, 폼, 우선</COND>
+			<EXAMPLE>경로(...)의 폼을 우선 실행한다.</EXAMPLE>
+			<KEYWORD>자식폼실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + E + V</CHAR>
+			<RUN>객체생성('폼', BP, '숨기기', OP)</RUN>
+			<COND>경로, 폼, 감춤</COND>
+			<EXAMPLE>경로(...)의 폼을 감춤 실행한다.</EXAMPLE>
+			<KEYWORD>자식폼실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>객체생성('비즈니스언어정의', BP, OP)</RUN>
+			<COND>경로, 업무규칙</COND>
+			<EXAMPLE>경로(...)의 업무규칙을 실행한다</EXAMPLE>
+			<KEYWORD>업무규칙실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>DB처리문실행 (OP, 조회결과)</RUN>
+			<COND>DB처리문</COND>
+			<EXAMPLE>DB처리문(...)을 실행한다.</EXAMPLE>
+			<RESULT>성공여부</RESULT>
+			<KEYWORD>DB처리문</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>DB처리문실행(N.OP, 조회결과)</RUN>
+			<COND>,DB처리문</COND>
+			<EXAMPLE>[OBJECT]에 DB처리문(...)을 실행한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<RESULT>성공여부</RESULT>
+			<KEYWORD>DB처리문</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.OP ()</RUN>
+			<COND>,문단</COND>
+			<EXAMPLE>...의 문단(...)를 실행한다.</EXAMPLE>
+			<HELP_EX>@폼의 문단(...)를 실행한다.</HELP_EX>	
+			<RESULT>실행결과</RESULT>
+			<KEYWORD>문단실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>OP ()</RUN>
+			<COND>문단</COND>
+			<EXAMPLE>문단(...)를 실행한다.</EXAMPLE>
+			<RESULT>실행결과</RESULT>
+			<KEYWORD>문단실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O ()</RUN>
+			<COND />
+			<EXAMPLE>...를 실행한다.</EXAMPLE>
+			<HELP_EX>@함수를 실행한다.</HELP_EX>
+			<RESULT>실행결과</RESULT>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.우선실행</RUN>
+			<COND />
+			<EXAMPLE>...을 우선 실행한다.</EXAMPLE>
+			<HELP_EX>@자식폼을 우선 실행한다.</HELP_EX>
+			<KEYWORD>우선실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + O + V</CHAR>
+			<RUN>OP(P)</RUN>
+			<COND>,문단</COND>
+			<EXAMPLE>(인자1, 인자2를 참조하여) 문단(...)을 실행한다.</EXAMPLE>
+			<RESULT>실행결과</RESULT>
+			<KEYWORD>문단실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + O + V</CHAR>
+			<RUN>O(P)</RUN>
+			<COND />
+			<EXAMPLE>(@인자1, @인자2를 참조하여) ...을 실행한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<RESULT>실행결과</RESULT>
+			<KEYWORD>문단실행</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>P + B + O + V</CHAR>
+			<RUN>B.OP(P)</RUN>
+			<COND>,,문단</COND>
+			<EXAMPLE>(@인자1, @인자2를 참조하여) ...의 문단(...)을 실행한다.</EXAMPLE>
+			<HELP_EX>(@인자1, @인자2를 참조하여) @폼의 문단(...)을 실행한다.</HELP_EX>	
+			<RESULT>실행결과</RESULT>
+			<KEYWORD>문단실행</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>C + E + O + E + V</CHAR>
+			<RUN>반복 (C) \n O</RUN>
+			<COND>,다음, 문단,반복</COND>
+			<EXAMPLE>(조건이면) 다음 문단을 반복 실행한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>E + O + E + E + V</CHAR>
+			<RUN>반복 (E1) \n O</RUN>
+			<COND>다음,문단,,반복</COND>
+			<EXAMPLE>다음 문단을 ...번 반복 실행한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>ELSEIF</GR_TYPE>
+			<CHAR>C + E + O + V</CHAR>
+			<RUN>또만일 (C) \n E</RUN>
+			<COND>,,문단</COND>
+			<EXAMPLE>(조건이면) 다음1 문단을 실행한다</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>17</ID>
+			<GR_TYPE>ELSE</GR_TYPE>
+			<CHAR>C + E + O + V</CHAR>
+			<RUN>아니면 \n E</RUN>
+			<COND>그 외에는, , 문단</COND>
+			<EXAMPLE>그 외에는 다음1 문단을 실행한다</EXAMPLE> 
+		</Patterns>
+		<Patterns>
+			<ID>19</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.처리위임</RUN>
+			<COND>, 안전모드</COND>
+			<EXAMPLE>[OBJECT]의 안전모드를 실행한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>			
+		</Patterns>
+		<Patterns>
+			<ID>20</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.팝업실행</RUN>
+			<COND>, 팝업창</COND>
+			<EXAMPLE>[OBJECT]의 팝업창을 실행한다.</EXAMPLE>
+			<KEYWORD>팝업실행</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>21</ID>
+			<GR_TYPE>FUNC</GR_TYPE>
+			<CHAR>F + E + O + V</CHAR>
+			<RUN>함수 F(VP)</RUN>
+			<COND>, 다음, 문단</COND>
+			<EXAMPLE>F이면 다음 문단을 실행한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>문단이란</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>22</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼_기능연계선택</RUN>
+			<COND>폼,기능연계, -면</COND>
+			<EXAMPLE>폼의 기능연계를 실행하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>23</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼_시간이벤트</RUN>
+			<COND>폼,시간이벤트, -면</COND>
+			<EXAMPLE>폼의 시간이벤트를 실행하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>24</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _기능연계선택</RUN>
+			<COND>, 기능연계, -면</COND>
+			<EXAMPLE>...의 기능연계를 실행하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>25</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>전역_열림</RUN>
+			<COND>업무규칙, -면</COND>
+			<EXAMPLE>업무규칙을 실행하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>26</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>프로그램실행(OP)</RUN>
+			<COND>프로그램</COND>
+			<EXAMPLE>프로그램(...)를 실행한다</EXAMPLE>
+			<KEYWORD>프로그램실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>27</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + E + O + V</CHAR>
+			<RUN>B.E ()</RUN>
+			<COND>,,기능</COND>
+			<EXAMPLE>[OBJECT]의 ... 기능을 실행한다.</EXAMPLE>
+			<KEYWORD>기능실행</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>28</ID>
+			<GR_TYPE>WHILE</GR_TYPE>
+			<CHAR>E + O + E + V</CHAR>
+			<RUN>반복 (참) \n O</RUN>
+			<COND>다음, 문단, 반복</COND>
+			<EXAMPLE>다음 문단을 반복 실행한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>29</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>보고서출력2(BP, 0, OP)</RUN>
+			<COND>경로, 보고서</COND>
+			<EXAMPLE>경로(...)의 보고서( ...)를 실행한다.</EXAMPLE>
+			<HELP_EX>경로(...)의 보고서(@출력할내용)를 실행한다.</HELP_EX>
+			<KEYWORD>보고서출력</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>30</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>보고서출력2(BP, 0, WP)</RUN>
+			<COND>경로, 보고서, 조건</COND>
+			<EXAMPLE>경로(...)의 보고서를 조건(...)으로 실행한다.</EXAMPLE>
+			<HELP_EX>경로(...)의 보고서를 조건(@실행조건, @그룹필드, @정렬필드, @실행테이블)으로 실행한다.</HELP_EX>
+			<KEYWORD>보고서출력</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>31</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>_기타동작</RUN>
+			<COND>, 기타동작, -면</COND>
+			<EXAMPLE>...의 기타동작을 실행하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+		  <ID>32</ID>
+		  <GR_TYPE>EXPR</GR_TYPE>
+		  <CHAR>O + V</CHAR>
+		  <RUN>폼.외부기능 (OP, 조회결과)</RUN>
+		  <COND>외부기능</COND>
+		  <EXAMPLE>외부기능(...)을 실행한다.</EXAMPLE>
+		  <RESULT>성공여부</RESULT>
+		  <KEYWORD>외부기능</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>33</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_시스템이벤트</RUN>
+      <COND>폼, 시스템이벤트, -면</COND>
+      <EXAMPLE>폼의 시스템이벤트를 실행하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>34</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _접속이벤트</RUN>
+      <COND>, 접속이벤트, -면</COND>
+      <EXAMPLE>...의 접속이벤트를 실행하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>35</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _자바스크립트이벤트</RUN>
+      <COND>, 자바스크립트이벤트, -면</COND>
+      <EXAMPLE>...의 자바스크립트이벤트를 실행하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>36</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>외부앱연동실행(OP)</RUN>
+      <COND>외부앱연동</COND>
+      <EXAMPLE>외부앱연동(...)를 실행한다</EXAMPLE>
+      <KEYWORD>외부앱연동</KEYWORD>
+    </Patterns>
+  
+   	<Patterns>
+			<ID>37</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.음성인식실행</RUN>
+			<COND>, 음성인식</COND>
+			<EXAMPLE>[OBJECT]의 음성인식을 실행한다</EXAMPLE>
+			<KEYWORD>음성인식</KEYWORD>			
+		</Patterns>
+   	<Patterns>
+			<ID>38</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.번역하기실행</RUN>
+			<COND>, 번역하기</COND>
+			<EXAMPLE>[OBJECT]의 번역하기를 실행한다</EXAMPLE>
+			<KEYWORD>음성인식</KEYWORD>			
+		</Patterns>
+   	<Patterns>
+			<ID>39</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.음성합성실행</RUN>
+			<COND>, 음성합성</COND>
+			<EXAMPLE>[OBJECT]의 음성합성을 실행한다</EXAMPLE>
+			<KEYWORD>음성인식</KEYWORD>			
+		</Patterns>
+    <Patterns>
+      <ID>40</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.영상인식실행</RUN>
+      <COND>, 영상인식</COND>
+      <EXAMPLE>[OBJECT]의 영상인식을 실행한다</EXAMPLE>
+      <KEYWORD>영상인식</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>41</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>폼.애니메이션실행 (OP)</RUN>
+      <COND>애니메이션</COND>
+      <EXAMPLE>애니메이션(...)을 실행한다.</EXAMPLE>
+      <RESULT>성공여부</RESULT>
+      <KEYWORD>애니메이션실행</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>42</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.애니메이션실행 (OP)</RUN>
+      <COND>, 애니메이션</COND>
+      <EXAMPLE>[OBJECT]의 애니메이션(...)을 실행한다.</EXAMPLE>
+      <RESULT>성공여부</RESULT>
+      <KEYWORD>애니메이션실행</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>43</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _이수실행</RUN>
+      <COND>, 이수, -면</COND>
+      <EXAMPLE>...의 이수를 실행하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>44</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>아톰변수함수실행(BP, O, OP)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...를 실행한다. </EXAMPLE>
+    </Patterns>
+    <Patterns>
+        <ID>45</ID>
+        <GR_TYPE>EXPR</GR_TYPE>
+        <CHAR>B + O + V</CHAR>
+        <RUN>B.시작</RUN>
+        <COND>, 재생</COND>
+        <EXAMPLE>...의 재생을 실행한다.</EXAMPLE>
+        <KEYWORD>재생</KEYWORD>
+      </Patterns>
+      <Patterns>
+		  <ID>46</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>B + O + V</CHAR>
+		  <RUN>서비스_시간이벤트</RUN>
+		  <COND>서비스,시간이벤트, -면</COND>
+		  <EXAMPLE>서비스의 시간이벤트를 실행하면</EXAMPLE>
+	  </Patterns>
+	  <Patterns>
+		  <ID>47</ID>
+		  <GR_TYPE>EXPR</GR_TYPE>
+		  <CHAR>B + O + V</CHAR>
+		  <RUN>객체생성('서비스스크립트', BP, 1, OP)</RUN>
+		  <COND>경로, 서비스</COND>
+		  <EXAMPLE>경로(...)의 서비스를 실행한다</EXAMPLE>
+		  <KEYWORD>서비스실행</KEYWORD>
+	  </Patterns>
+	  <Patterns>
+		  <ID>48</ID>
+		  <GR_TYPE>EXPR</GR_TYPE>
+		  <CHAR>B + O + W + V</CHAR>
+		  <RUN>객체생성('폼', BP, '시작', OP)</RUN>
+		  <COND>경로, 폼, 최상위</COND>
+		  <EXAMPLE>경로(...)의 폼을 최상위로 실행한다.</EXAMPLE>
+		  <KEYWORD>자식폼실행</KEYWORD>
+	  </Patterns>
+    <Patterns>
+      <ID>49</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.센서초기화(참, '걸음서비스', OP)</RUN>
+      <COND>서비스, 걸음감지센서</COND>
+      <EXAMPLE>서비스의 걸음감지센서를 실행한다.</EXAMPLE>
+      <KEYWORD>센서초기화</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>50</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.센서초기화(참, '위치서비스', OP)</RUN>
+      <COND>서비스, 위치감지센서</COND>
+      <EXAMPLE>서비스의 위치감지센서를 실행한다.</EXAMPLE>
+      <KEYWORD>센서초기화</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>51</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.센서초기화(참, '블루투스', OP)</RUN>
+      <COND>서비스, 블루투스</COND>
+      <EXAMPLE>서비스의 블루투스(...)를 실행한다.</EXAMPLE>
+      <KEYWORD>센서초기화</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>52</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>폼.인공지능서비스(OP)</RUN>
+      <COND>인공지능서비스</COND>
+      <EXAMPLE>인공지능서비스(...)를 실행한다.</EXAMPLE>
+      <RESULT>성공여부</RESULT>
+      <KEYWORD>인공지능서비스</KEYWORD>
+    </Patterns>
+  </Verb>
+  
+	<Verb> 
+		<VERBID>표시ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>메시지(OP, VP)</RUN>
+			<COND>문장, 화면</COND>
+			<EXAMPLE>문장(...)를 화면에 표시한다('예아니오', '질문').</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>메시지표시</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>메시지(OP, VP)</RUN>
+			<COND>화면, 문장</COND>
+			<EXAMPLE>화면에 문장(...)를 표시한다('예아니오', '질문').</EXAMPLE>
+			<KEYWORD>메시지표시</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + V</CHAR>
+			<RUN>메시지(O, VP)</RUN>
+			<COND>, 화면</COND>
+			<EXAMPLE>...를 화면에 표시한다</EXAMPLE>
+			<KEYWORD>메시지표시</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + N + E + V</CHAR>
+			<RUN>O.다시보기</RUN>
+			<COND>, 폼,다시</COND>
+			<EXAMPLE>[OBJECT]을 폼에 다시 표시한다.</EXAMPLE>
+			<KEYWORD>다시보기</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.항목변경선택 (OP, '보이기')</RUN>
+			<COND>, 항목</COND>
+			<EXAMPLE>[OBJECT]의 항목(...)을 표시한다</EXAMPLE>
+			<KEYWORD>검색창항목표시변경</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.보여주기 (OP)</RUN>
+			<COND>, 행</COND>
+			<EXAMPLE>[OBJECT]의 행(...)을 표시한다</EXAMPLE>
+			<HELP_EX>[OBJECT]의 행(@행번호)을 표시한다</HELP_EX>
+			<KEYWORD>트리행표시</KEYWORD>		
+	</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.검색시작</RUN>
+			<COND>, 데이터</COND>
+			<EXAMPLE>[OBJECT]의 데이터를 표시한다.</EXAMPLE>
+			<KEYWORD>데이터표시</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + N + V</CHAR>
+			<RUN>B.기본검색키동작('읽기', '지금')</RUN>
+			<COND>, 관련데이터, 폼</COND>
+			<EXAMPLE>[OBJECT]의 관련데이터를 폼에 표시한다</EXAMPLE>
+			<KEYWORD>관련데이터표시</KEYWORD>			
+		</Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + W + V</CHAR>
+      <RUN>알림표시(O, WP)</RUN>
+      <COND>, 알림</COND>
+      <EXAMPLE>...을 알림으로 표시한다</EXAMPLE>
+      <KEYWORD>알림표시</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + W + V</CHAR>
+      <RUN>팝업표시(O, WP)</RUN>
+      <COND>, 팝업</COND>
+      <EXAMPLE>...을 팝업으로 표시한다</EXAMPLE>
+      <KEYWORD>팝업표시</KEYWORD>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>준비ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>DB처리문준비 (OP, 조회결과)</RUN>
+			<COND>DB처리문</COND>
+			<EXAMPLE>DB처리문(...)을 준비한다.</EXAMPLE>
+			<KEYWORD>DB처리문</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>검색ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>I.IP0.찾기(B)</RUN>
+			<COND>,,위치</COND>
+			<EXAMPLE>[OBJECT]에서 ...의 위치를 검색하여</EXAMPLE>
+			<HELP_EX>[OBJECT]에서 @검색할문자열의 위치를 검색하여</HELP_EX>
+			<RESULT>검색된위치</RESULT>
+			<KEYWORD>위치검색</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + E + V</CHAR>
+			<RUN>I.IP0.뒤로찾기(B)</RUN>
+			<COND>,,위치,뒤</COND>
+			<EXAMPLE>[OBJECT]에서 ...의 위치를 뒤부터 검색하여</EXAMPLE>
+			<HELP_EX>[OBJECT]에서 @검색할문자열의 위치를 뒤부터 검색하여</HELP_EX>	
+			<RESULT>검색된위치</RESULT>
+			<KEYWORD>위치검색</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + B + O + E + V</CHAR>
+			<RUN>I.IP0.찾기(B, E)</RUN>
+			<COND>,,위치,-부터</COND>
+			<EXAMPLE>[OBJECT]에서 ...의 위치를 ...부터 검색하여</EXAMPLE>
+			<HELP_EX>[OBJECT]에서 @검색할문자열의 위치를 @지정된위치부터 검색하여</HELP_EX>
+			<RESULT>검색된위치</RESULT>
+			<KEYWORD>위치검색</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.검색시작</RUN>
+			<COND>,데이터,</COND>
+			<EXAMPLE>[OBJECT]의 데이터를 검색한다</EXAMPLE>
+			<KEYWORD>데이터검색</KEYWORD>			
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>변경ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.실수로()</RUN>
+			<COND>,실수</COND>
+			<EXAMPLE>[OBJECT]을 실수로 변경하여</EXAMPLE>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>형식변경</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.정수로(WP)</RUN>
+			<COND>,정수</COND>
+			<EXAMPLE>[OBJECT]을 정수(...)로 변경하여</EXAMPLE>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>형식변경</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.문자로(WP)</RUN>
+			<COND>,문자</COND>
+			<EXAMPLE>[OBJECT]을 문자(...)로 변경하여</EXAMPLE>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>형식변경</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>암호화('암호화', O, WP)</RUN>
+			<COND>,암호</COND>
+			<EXAMPLE>...을 암호(..., ...)로 변경하여</EXAMPLE>
+			<HELP_EX>...을 암호(@암호화키)로 변경하여</HELP_EX>
+			<RESULT>암호화값</RESULT>
+			<KEYWORD>암호화</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>암호화('복호화', O, WP)</RUN>
+			<COND>,원래값</COND>
+			<EXAMPLE>...을 원래값(..., ...)으로 변경하여</EXAMPLE>
+			<HELP_EX>...을 원래값(@암호화키)으로 변경하여</HELP_EX>
+			<RESULT>해석된값</RESULT>
+			<KEYWORD>암호화</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>커서변경(W)</RUN>
+			<COND>커서</COND>
+			<EXAMPLE>커서를 ...로 변경한다.</EXAMPLE>
+			<HELP_EX>커서를 '화살표'|'모래시계'|'진행'으로 변경한다.</HELP_EX>
+			<KEYWORD>커서변경</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + O + W + V</CHAR>
+			<RUN>I.IP0.바꾸기(O, W)</RUN>
+			<COND />
+			<EXAMPLE>[OBJECT]에서 ...를 ...로 변경하여</EXAMPLE>
+			<HELP_EX>[OBJECT]에서 @바뀔문자열를 @바꿀문자열로 변경하여</HELP_EX>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>바꾸기</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.대문자()</RUN>
+			<COND>,대문자</COND>
+			<EXAMPLE>[OBJECT]를 대문자로 변경하여</EXAMPLE>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>대소문자변경</KEYWORD>					
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>O.IP0.소문자()</RUN>
+			<COND>,소문자</COND>
+			<EXAMPLE>[OBJECT]를 소문자로 변경하여</EXAMPLE>
+			<RESULT>변경된값</RESULT>
+			<KEYWORD>대소문자변경</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>I _선택변경</RUN>
+			<COND>,항목, 선택</COND>
+			<EXAMPLE>...에서 항목의 선택을 변경하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V + N</CHAR>
+			<RUN>I _선택변경완료</RUN>
+			<COND>,항목, 선택, ,후</COND>
+			<EXAMPLE>...에서 항목의 선택을 변경한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>폼.질의수정(BP, O, 거짓, W)</RUN>
+			<COND>DB처리문</COND>
+			<EXAMPLE>DB처리문(...)의 '실행조건'을 ....으로 변경한다</EXAMPLE>
+			<HELP_EX>DB처리문(...)의 '실행조건'을 @변경내용으로 변경한다</HELP_EX>	
+		</Patterns>
+    <Patterns>
+      <ID>13</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _값변경</RUN>
+      <COND>,값</COND>
+      <EXAMPLE>...의 값을 변경하면</EXAMPLE>
+    </Patterns>
+      <Patterns>
+      <ID>14</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _페이지변경</RUN>
+      <COND>,페이지</COND>
+      <EXAMPLE>...의 페이지를 변경하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _선택년월변경</RUN>
+      <COND>,선택년월</COND>
+      <EXAMPLE>...의 선택년월을 변경하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>16</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + W + V</CHAR>
+      <RUN>O.IP0.한글로(WP)</RUN>
+      <COND>,한글</COND>
+      <EXAMPLE>[OBJECT]을 한글(...)로 변경하여</EXAMPLE>
+      <RESULT>변경된값</RESULT>
+      <KEYWORD>형식변경</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>17</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _채팅방변경</RUN>
+      <COND>,채팅방</COND>
+      <EXAMPLE>...의 채팅방을 변경하면</EXAMPLE>
+    </Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>종료ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.닫기</RUN>
+			<COND>, 연결</COND>
+			<EXAMPLE>...의 연결을 종료한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>			
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O.닫기</RUN>
+			<COND />
+			<EXAMPLE>...을 종료한다.</EXAMPLE>
+			<KEYWORD>폼종료</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>종료</RUN>
+			<COND>문단, 실행</COND>
+			<EXAMPLE>문단의 실행을 종료한다.</EXAMPLE>
+			<KEYWORD>문단종료</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>빠짐</RUN>
+			<COND>반복, 실행</COND>
+			<EXAMPLE>반복 실행을 종료한다.</EXAMPLE>
+			<KEYWORD>반복종료</KEYWORD>						
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>전역_접속종료</RUN>
+			<COND>접속, -면</COND>
+			<EXAMPLE>접속을 종료하면</EXAMPLE>
+		</Patterns>
+   		<Patterns>
+				<ID>6</ID>
+				<GR_TYPE>EXPR</GR_TYPE>
+				<CHAR>B + O + V</CHAR>
+				<RUN>B.음성합성종료</RUN>
+				<COND>, 음성합성</COND>
+				<EXAMPLE>[OBJECT]의 음성합성을 종료한다.</EXAMPLE>
+				<KEYWORD>음성합성</KEYWORD>			
+			</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.음성인식종료</RUN>
+			<COND>, 음성인식</COND>
+			<EXAMPLE>[OBJECT]의 음성인식을 종료한다.</EXAMPLE>
+			<KEYWORD>음성인식</KEYWORD>			
+		</Patterns>
+		<Patterns>
+		  <ID>8</ID>
+		  <GR_TYPE>EXPR</GR_TYPE>
+		  <CHAR>O + V</CHAR>
+		  <RUN>O.블루투스종료</RUN>
+		  <COND />
+		  <EXAMPLE>...를 종료한다.</EXAMPLE>
+		  <KEYWORD>블루투스종료</KEYWORD>
+		</Patterns>
+		<Patterns>
+		  <ID>9</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>B + O + V</CHAR>
+		  <RUN>B _이수종료</RUN>
+		  <COND>, 이수, -면</COND>
+		  <EXAMPLE>...의 이수를 종료하면</EXAMPLE>
+		</Patterns>
+	  <Patterns>
+		  <ID>10</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>O + V</CHAR>
+		  <RUN>서비스_종료</RUN>
+		  <COND>서비스, -면</COND>
+		  <EXAMPLE>서비스를 종료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>앱종료</RUN>
+			<COND>앱</COND>
+			<EXAMPLE>앱을 종료한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _타이머종료</RUN>
+			<COND>, 타이머, -면</COND>
+			<EXAMPLE>...의 타이머를 종료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>서비스.센서초기화(거짓, '위치서비스', OP)</RUN>
+			<COND>서비스, 위치감지센서</COND>
+			<EXAMPLE>서비스의 위치감지센서를 종료한다.</EXAMPLE>
+			<KEYWORD>센서초기화</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>서비스.센서초기화(거짓, '걸음서비스', OP)</RUN>
+			<COND>서비스, 걸음감지센서</COND>
+			<EXAMPLE>서비스의 걸음감지센서를 종료한다.</EXAMPLE>
+			<KEYWORD>센서초기화</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.센서초기화(거짓, '블루투스', OP)</RUN>
+      <COND>서비스, 블루투스</COND>
+      <EXAMPLE>서비스의 블루투스를 종료한다.</EXAMPLE>
+      <KEYWORD>센서초기화</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>16</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스_종료완료</RUN>
+      <COND>서비스, 블루투스, -면</COND>
+      <EXAMPLE>서비스의 블루투스를 종료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>17</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _광고종료</RUN>
+      <COND>, 광고, -면</COND>
+      <EXAMPLE>...의 광고를 종료하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+	
+	<Verb>
+		<VERBID>이동ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>CONTROL</GR_TYPE>
+			<CHAR>B + W + V</CHAR>
+			<RUN>계속</RUN>
+			<COND>문단, 처음</COND>
+			<EXAMPLE>문단의 처음으로 이동한다</EXAMPLE>
+			<KEYWORD>문단이동</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>W + O + V</CHAR>
+			<RUN>W.초점주기</RUN>
+			<COND>, 초점</COND>
+			<EXAMPLE>[OBJECT]으로 초점을 이동한다.</EXAMPLE>
+			<KEYWORD>초점주기</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.이동(EP)</RUN>
+			<COND>, -만큼</COND>
+			<EXAMPLE>[OBJECT]을  좌표(..., ...)만큼 이동한다.</EXAMPLE>
+			<KEYWORD>초점이동</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>W + O + V</CHAR>
+			<RUN>W _초점얻음</RUN>
+			<COND>, 초점, -면</COND>
+			<EXAMPLE>...로 초점을 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _초점잃음</RUN>
+			<COND>, 초점, -면</COND>
+			<EXAMPLE>...에서 초점을 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _처리항목이동</RUN>
+			<COND>, 처리항목, -면</COND>
+			<EXAMPLE>...에서 처리항목을 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + W + H + V</CHAR>
+			<RUN>B _마우스위</RUN>
+			<COND>, 안, 커서, -면</COND>
+			<EXAMPLE>...의 안으로 커서가 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + W + H + V</CHAR>
+			<RUN>B _마우스외</RUN>
+			<COND>, 밖, 커서, -면</COND>
+			<EXAMPLE>...의 밖으로 커서가 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>H + I + O + V</CHAR>
+			<RUN>H _스크롤내이동</RUN>
+			<COND>, 스크롤안, 초점, -면</COND>
+			<EXAMPLE>...이 스크롤안에서 초점을 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+		  <ID>10</ID>
+		  <GR_TYPE>ASSIGN</GR_TYPE>
+		  <CHAR>O + W + V</CHAR>
+		  <RUN>O = W</RUN>
+		  <COND/>
+		  <EXAMPLE>...을 ...로 이동한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+		  <ID>11</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>B + W + V</CHAR>
+		  <RUN>B _첫행이동</RUN>
+		  <COND>, 첫행, -면</COND>
+		  <EXAMPLE>...의 첫행으로 이동하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+		  <ID>12</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>B + W + V</CHAR>
+		  <RUN>B _끝행이동</RUN>
+		  <COND>, 끝행, -면</COND>
+		  <EXAMPLE>...의 끝행으로 이동하면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>13</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>W + O + V</CHAR>
+      <RUN>폼.스크롤위치(W, OP)</RUN>
+      <COND>, 스크롤위치</COND>
+      <EXAMPLE>...로 스크롤위치를 이동한다.</EXAMPLE>
+    </Patterns>
+  </Verb>
+
+  <Verb>
+    <VERBID>성공ㅎ</VERBID>
+    <Patterns>
+      <ID>1</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _결제성공</RUN>
+      <COND>, 결제, -면</COND>
+      <EXAMPLE>...의 결제를 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _빌링키발급성공</RUN>
+      <COND>, 빌링키발급, -면</COND>
+      <EXAMPLE>...의 빌링키발급을 성공하면</EXAMPLE>
+    </Patterns> 
+    <Patterns>
+      <ID>3</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _빌링키결제성공</RUN>
+      <COND>, 빌링키결제, -면</COND>
+      <EXAMPLE>...의 빌링키결제를 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>4</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _광고성공</RUN>
+      <COND>, 실행, -면</COND>
+      <EXAMPLE>...의 실행을 성공하면</EXAMPLE>
+    </Patterns>
+      <Patterns>
+      <ID>5</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _오픈인증성공</RUN>
+      <COND>, 오픈인증, -면</COND>
+      <EXAMPLE>...의 오픈인증을 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _채팅방생성성공</RUN>
+      <COND>, 채팅방생성, -면</COND>
+      <EXAMPLE>...의 채팅방생성을 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _본인인증성공</RUN>
+      <COND>, 본인인증, -면</COND>
+      <EXAMPLE>...의 본인인증을 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_문제풀이성공</RUN>
+      <COND>아톰, 문제풀이, -면</COND>
+      <EXAMPLE>아톰의 문제풀이를 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _문제풀이성공</RUN>
+      <COND>, 문제풀이, -면</COND>
+      <EXAMPLE>...의 문제풀이를 성공하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _인증성공</RUN>
+      <COND>, 인증, -면</COND>
+      <EXAMPLE>...의 인증을 성공하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+
+  <Verb>
+		<VERBID>실패ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>V + E</CHAR>
+			<RUN>실행결과 = -1</RUN>
+			<COND>, 경우</COND>
+			<EXAMPLE>실패할 경우에는</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _결제실패</RUN>
+      <COND>, 결제, -면</COND>
+      <EXAMPLE>...의 결제를 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>3</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _빌링키발급실패</RUN>
+      <COND>, 빌링키발급, -면</COND>
+      <EXAMPLE>...의 빌링키발급을 실패하면</EXAMPLE>
+    </Patterns> 
+    <Patterns>
+      <ID>4</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _빌링키결제실패</RUN>
+      <COND>, 빌링키결제, -면</COND>
+      <EXAMPLE>...의 빌링키결제를 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>5</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _광고실패</RUN>
+      <COND>, 실행, -면</COND>
+      <EXAMPLE>...의 실행을 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _오픈인증실패</RUN>
+      <COND>, 오픈인증, -면</COND>
+      <EXAMPLE>...의 오픈인증을 실패하면</EXAMPLE>
+    </Patterns>
+      <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _채팅방생성실패</RUN>
+      <COND>, 채팅방생성, -면</COND>
+      <EXAMPLE>...의 채팅방생성을 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _본인인증실패</RUN>
+      <COND>, 본인인증, -면</COND>
+      <EXAMPLE>...의 본인인증을 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_문제풀이실패</RUN>
+      <COND>아톰, 문제풀이, -면</COND>
+      <EXAMPLE>아톰의 문제풀이를 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>10</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _문제풀이실패</RUN>
+      <COND>, 문제풀이, -면</COND>
+      <EXAMPLE>...의 문제풀이를 실패하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>11</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _인증실패</RUN>
+      <COND>, 인증, -면</COND>
+      <EXAMPLE>...의 인증을 실패하면</EXAMPLE>
+    </Patterns>
+    
+  </Verb>
+
+	<Verb>
+		<VERBID>전개ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.트리전개(OP, VP)</RUN>
+			<COND>, 행</COND>
+			<EXAMPLE>[OBJECT]의 행(...)를 전개(...)한다</EXAMPLE>
+			<HELP_EX>[OBJECT]의 행(@행번호)를 전개('확장'|'축소'|'자동')한다</HELP_EX>
+			<KEYWORD>트리전개</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>전달ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>PARAM</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND />
+			<EXAMPLE>...를 전달하여</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>추가ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>폼.질의수정(BP, '실행조건', 참, O)</RUN>
+			<COND>DB처리문, 실행조건</COND>
+			<EXAMPLE>DB처리문(...)의 실행조건에 ...을 추가한다</EXAMPLE>
+			<HELP_EX>DB처리문(...)의 실행조건에 @추가할조건을 추가한다</HELP_EX>		
+	</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>폼.질의수정(BP, N, 참, O)</RUN>
+			<COND>DB처리문</COND>
+			<EXAMPLE>DB처리문(...)의 ...에 ...을 추가한다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.추가 (WP, O)</RUN>
+			<COND>,,행</COND>
+			<EXAMPLE>...에 ...를 행(...)으로 추가한다.</EXAMPLE>
+			<HELP_EX>...에 @추가할배열를 행(@행번호)으로 추가한다.</HELP_EX>
+			<KEYWORD>행추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.행추가 (WP, O)</RUN>
+			<COND>BrowseAtom/ReportBrowseAtom/WebBoardAtom,,행</COND>
+			<EXAMPLE>[OBJECT]에 ...를 행(...)으로 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 @추가할배열를 행(@행번호)으로 추가한다.</HELP_EX>
+			<KEYWORD>행추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.행추가 (WP, O)</RUN>
+			<COND>TreeAtom,,행</COND>
+			<EXAMPLE>[OBJECT]에 ...를 행(...)으로 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 @추가할배열를 행(@행번호)으로 추가한다.</HELP_EX>
+			<KEYWORD>행추가</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>N + O + W + V</CHAR>
+      <RUN>N.그리드행추가 (WP, O)</RUN>
+      <COND>DBGridExAtom/StructureGridAtom,,행</COND>
+      <EXAMPLE>[OBJECT]에 ...를 행(...)으로 추가한다.</EXAMPLE>
+      <HELP_EX>[OBJECT]에 @추가할배열를 행(@행번호)으로 추가한다.</HELP_EX>
+      <KEYWORD>행추가</KEYWORD>
+    </Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.행추가 (OP)</RUN>
+			<COND>,행</COND>
+			<EXAMPLE>[OBJECT]에 행(...)을 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 행(@행번호)을 추가한다.</HELP_EX>
+			<KEYWORD>행추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.열추가 (WP, O)</RUN>
+			<COND>,,열</COND>
+			<EXAMPLE>[OBJECT]에 ...를 열(...)로 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 @추가할배열를 열(@열이름또는열번호)로 추가한다.</HELP_EX>
+			<KEYWORD>열추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.열추가 (OP)</RUN>
+			<COND>,열</COND>
+			<EXAMPLE>[OBJECT]에 열(...)을 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 열(@열정보)을 추가한다.</HELP_EX>
+			<KEYWORD>열추가</KEYWORD>			
+	</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.필드추가 (OP, W)</RUN>
+			<COND>,필드</COND>
+			<EXAMPLE>[OBJECT]에 필드(...)를 ...로 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 필드(@위치)를 @구성정보로 추가한다.</HELP_EX>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>필드추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + W + V</CHAR>
+			<RUN>N.메모리추가 (OP, W)</RUN>
+			<COND>,메모리</COND>
+			<EXAMPLE>[OBJECT]에 메모리(...)를 ...로 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에 메모리(@위치)를 @구성정보로 추가한다.</HELP_EX>
+			<KEYWORD>메모리추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>B.메뉴추가 (NP, O)</RUN>
+			<COND>,기능연계</COND>
+			<EXAMPLE>[OBJECT]의 기능연계(...)에 ...를 추가한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]의 기능연계(@위치)에 @연계정보를 추가한다.</HELP_EX>
+			<KEYWORD>기능연계추가</KEYWORD>
+	</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _행추가</RUN>
+			<COND>, 행, -면</COND>
+			<EXAMPLE>...에 행을 추가하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _열추가</RUN>
+			<COND>, 열, -면</COND>
+			<EXAMPLE>...에 열을 추가하면</EXAMPLE>
+		</Patterns>
+
+    <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.선긋기정보('추가', OP)</RUN>
+      <COND>, 선긋기정보</COND>
+      <EXAMPLE>...의 선긋기정보을 추가한다</EXAMPLE>
+    </Patterns>
+
+  </Verb>
+	<Verb>
+		<VERBID>삽입ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>B.추가(NP, O)</RUN>
+			<COND>,행</COND>
+			<EXAMPLE>[OBJECT]의 행(...)에 ...를 삽입한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]의 행(@행번호)에 @삽입할데이터를 삽입한다</HELP_EX>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>행추가</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>시작ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.처리시작</RUN>
+			<COND>, 일괄처리</COND>
+			<EXAMPLE>[OBJECT]에 일괄처리를 시작한다</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>시간측정('시작')</RUN>
+			<COND>시간측정,</COND>
+			<EXAMPLE>시간측정을 시작한다.</EXAMPLE>
+			<KEYWORD>시간측정</KEYWORD>
+		</Patterns>
+   	<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _음성인식시작</RUN>
+			<COND>, 음성인식, -면</COND>
+			<EXAMPLE>...의 음성인식을 시작하면</EXAMPLE>
+		</Patterns>
+  	<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _번역하기시작</RUN>
+			<COND>, 번역하기, -면</COND>
+			<EXAMPLE>...의 번역하기를 시작하면</EXAMPLE>
+		</Patterns> 
+   	<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _음성합성시작</RUN>
+			<COND>, 음성합성, -면</COND>
+			<EXAMPLE>...의 음성합성을 시작하면</EXAMPLE>
+		</Patterns> 
+    <Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>서비스_시작</RUN>
+			<COND>서비스, -면</COND>
+			<EXAMPLE>서비스를 시작하면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.수신시작</RUN>
+      <COND>, 수신</COND>
+      <EXAMPLE>...의 수신을 시작한다.</EXAMPLE>
+      <KEYWORD>수신시작</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>8</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.송신시작</RUN>
+      <COND>, 송신</COND>
+      <EXAMPLE>...의 송신을 시작한다.</EXAMPLE>
+      <KEYWORD>송신시작</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _재생시작</RUN>
+      <COND>, 재생, -면</COND>
+      <EXAMPLE>...의 재생을 시작하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+	<Verb>
+		<VERBID>중지ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>시간측정('중지', OP)</RUN>
+			<COND>시간측정</COND>
+			<EXAMPLE>시간측정(...)을 중지한다.</EXAMPLE>
+			<HELP_EX>시간측정(@제목)을 중지한다.</HELP_EX>
+			<RESULT>측정된시간</RESULT>
+			<KEYWORD>시간측정</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>폼.애니메이션중지(OP)</RUN>
+      <COND>애니메이션</COND>
+      <EXAMPLE>애니메이션(...)을 중지한다.</EXAMPLE>
+      <RESULT>성공여부</RESULT>
+      <KEYWORD>애니메이션중지</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>3</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.애니메이션중지(OP)</RUN>
+      <COND>, 애니메이션</COND>
+      <EXAMPLE>[OBJECT]의 애니메이션(...)을 중지한다.</EXAMPLE>
+      <RESULT>성공여부</RESULT>
+      <KEYWORD>애니메이션중지</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>4</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.수신중지</RUN>
+      <COND>, 수신</COND>
+      <EXAMPLE>...의 수신을 중지한다.</EXAMPLE>
+      <KEYWORD>수신중지</KEYWORD>
+    </Patterns>
+    <Patterns>
+      <ID>5</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.송신중지</RUN>
+      <COND>, 송신</COND>
+      <EXAMPLE>...의 송신을 중지한다.</EXAMPLE>
+      <KEYWORD>송신중지</KEYWORD>
+    </Patterns>
+  </Verb>
+	<Verb>
+		<VERBID>취소ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N.처리되돌림</RUN>
+			<COND>,안전모드</COND>
+			<EXAMPLE>[OBJECT]의 안전모드을 취소한다.</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>MULTI</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>실행취소</RUN>
+			<COND>문단,실행</COND>
+			<EXAMPLE>문단의 실행을 취소한다</EXAMPLE>
+			<KEYWORD>문단취소</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>트랜잭션메시지(0)</RUN>
+			<COND>DB처리</COND>
+			<EXAMPLE>DB처리를 취소한다.</EXAMPLE>
+			<KEYWORD>트랜잭션메시지</KEYWORD>		
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>해제ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 거짓</RUN>
+			<COND />
+			<EXAMPLE>...을 해제하다</EXAMPLE>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼.시간이벤트('해제', OP)</RUN>
+			<COND>폼,시간이벤트,</COND>
+			<EXAMPLE>폼의 시간이벤트를 해제한다.</EXAMPLE>
+			<KEYWORD>시간이벤트해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.사용자메시지(거짓)</RUN>
+			<COND>,안내문장,</COND>
+			<EXAMPLE>[OBJECT]의 안내문장을 해제한다.</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>사용자메시지</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 거짓</RUN>
+			<COND>,속성</COND>
+			<EXAMPLE>... 속성을 해제하다</EXAMPLE>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.네비게이션바('해제')</RUN>
+      <COND>폼,네비게이션바</COND>
+      <EXAMPLE>폼의 네비게이션바를 해제한다.</EXAMPLE>
+      <KEYWORD>네비게이션바해제</KEYWORD>
+    </Patterns>
+    <Patterns> 
+      <ID>7</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>아톰변수(1, BP, O, OP, 거짓)</RUN>
+      <COND>아톰변수</COND>
+      <EXAMPLE>아톰변수(...)의 ...를 해제한다.</EXAMPLE>
+      <KEYWORD>아톰변수</KEYWORD>
+    </Patterns> 
+
+    <Patterns> 
+      <ID>8</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>알람기능('해제', OP)</RUN>
+      <COND>알람기능</COND>
+      <EXAMPLE>알람기능을 해제한다.</EXAMPLE>
+      <KEYWORD>알람기능</KEYWORD>
+    </Patterns>
+
+    <Patterns>
+      <ID>9</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스.시간이벤트('해제', OP)</RUN>
+      <COND>서비스,시간이벤트,</COND>
+      <EXAMPLE>서비스의 시간이벤트를 해제한다.</EXAMPLE>
+      <KEYWORD>시간이벤트해제</KEYWORD>
+    </Patterns>
+
+  </Verb>
+    
+	<Verb>
+		<VERBID>허용ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 참</RUN>
+			<COND />
+			<EXAMPLE>...을 허용하다</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 참</RUN>
+			<COND>,속성</COND>
+			<EXAMPLE>... 속성을 허용하다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>금지ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O = 거짓</RUN>
+			<COND />
+			<EXAMPLE>...을 금지하다</EXAMPLE>
+			<SHOW>TRUE</SHOW>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>ASSIGN</GR_TYPE>
+			<CHAR>E + O + V</CHAR>
+			<RUN>E = 참</RUN>
+			<COND>,속성</COND>
+			<EXAMPLE>... 속성을 금지하다</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+			<KEYWORD>속성설정해제</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>삭제ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O.모두삭제</RUN>
+			<COND>, 모두</COND>
+			<EXAMPLE>[OBJECT]를 모두 삭제한다.</EXAMPLE>
+			<KEYWORD>모두삭제</KEYWORD>	
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I.모두삭제(OP)</RUN>
+			<COND>DBGridExAtom, 일부</COND>
+			<EXAMPLE>[OBJECT]에서 일부(...)를 삭제한다.</EXAMPLE>
+			<HELP_EX>[OBJECT]에서 일부(@제외대상)를 삭제한다.</HELP_EX>
+			<KEYWORD>일부삭제</KEYWORD>
+		</Patterns>		
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.삭제 (OP)</RUN>
+			<COND>, 행</COND>
+			<EXAMPLE>[OBJECT]의 행(@행번호)를 삭제한다.</EXAMPLE>
+			<KEYWORD>행삭제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.행삭제 (OP)</RUN>
+			<COND>ScrollAtom/ExtensionScroll/DBGridExAtom/TreeAtom/StructureGrid, 행</COND>
+			<EXAMPLE>[OBJECT]의 행(@행번호)를 삭제한다.</EXAMPLE>
+			<KEYWORD>행삭제</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.행삭제 (-1, OP)</RUN>
+			<COND>BrowseAtom/ReportBrowseAtom/WebBoardAtom, 행</COND>
+			<EXAMPLE>[OBJECT]의 행(@행번호)를 삭제한다.</EXAMPLE>
+      <KEYWORD>행삭제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.열삭제 (OP)</RUN>
+			<COND>, 열</COND>
+			<EXAMPLE>[OBJECT]의 열(@열번호)를 삭제한다.</EXAMPLE>
+			<KEYWORD>열삭제</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + X + O + V</CHAR>
+			<RUN>I.행삭제 ('체크')</RUN>
+			<COND>,체크ㅎ</COND>
+			<EXAMPLE>[OBJECT]에서 체크한 행을 삭제한다</EXAMPLE>
+			<KEYWORD>행삭제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + X + O + V</CHAR>
+			<RUN>I.행삭제 ('선택')</RUN>
+			<COND>,선택ㅎ</COND>
+			<EXAMPLE>[OBJECT]에서 선택한 행을 삭제한다</EXAMPLE>
+			<KEYWORD>행삭제</KEYWORD>
+		</Patterns>
+
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.필드삭제 (OP)</RUN>
+			<COND>, 필드</COND>
+			<EXAMPLE>[OBJECT]의 필드(...)를 삭제한다.</EXAMPLE>
+			<KEYWORD>필드삭제</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.메모리삭제 (OP)</RUN>
+			<COND>, 메모리</COND>
+			<EXAMPLE>[OBJECT]의 메모리(...)를 삭제한다.</EXAMPLE>
+			<KEYWORD>메모리삭제</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.메뉴삭제 (OP)</RUN>
+			<COND>, 기능연계</COND>
+			<EXAMPLE>[OBJECT]의 기능연계(@번호)를 삭제한다.</EXAMPLE>
+			<KEYWORD>기능연계추가</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>13</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _행삭제</RUN>
+			<COND>, 행, -면</COND>
+			<EXAMPLE>...에서 행을 삭제하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _열삭제</RUN>
+			<COND>, 열, -면</COND>
+			<EXAMPLE>...에서 열을 삭제하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>15</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _삭제</RUN>
+			<COND>, 데이터, -면</COND>
+			<EXAMPLE>...에서 데이터을 삭제하면</EXAMPLE>
+		</Patterns>
+
+    <Patterns>
+      <ID>16</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B.선긋기정보('삭제', OP)</RUN>
+      <COND>, 선긋기정보</COND>
+      <EXAMPLE>...의 선긋기정보을 삭제한다</EXAMPLE>
+    </Patterns>
+
+
+  </Verb>
+	<Verb>
+		<VERBID>선택ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택값('선택', '전체')</RUN>
+			<COND>,-ㄴ, 전체데이터</COND>
+			<EXAMPLE>[OBJECT]에서 선택한 전체데이터</EXAMPLE>
+			<RESULT>선택데이터</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택값('선택', '참조')</RUN>
+			<COND>,-ㄴ, 참조데이터</COND>
+			<EXAMPLE>[OBJECT]에서 선택한 참조데이터</EXAMPLE>
+			<RESULT>선택데이터</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.선택값('다중선택', '전체')</RUN>
+			<COND>, 다중, -ㄴ, 전체데이터</COND>
+			<EXAMPLE>[OBJECT]에서 다중 선택한 전체데이터</EXAMPLE>
+			<RESULT>선택데이터</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.선택값('다중선택', '참조')</RUN>
+			<COND>, 다중, -ㄴ, 참조데이터</COND>
+			<EXAMPLE>[OBJECT]에서 다중 선택한 참조데이터</EXAMPLE>
+			<RESULT>선택데이터</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택행('선택')</RUN>
+			<COND>,-ㄴ, 행번호</COND>
+			<EXAMPLE>[OBJECT]에서 선택한 행번호</EXAMPLE>
+			<RESULT>선택행번호</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + E + V + O</CHAR>
+			<RUN>I.선택행('다중선택')</RUN>
+			<COND>, 다중, -ㄴ, 행번호</COND>
+			<EXAMPLE>[OBJECT]에서 다중 선택한 행번호</EXAMPLE>
+			<RESULT>선택행번호</RESULT>
+			<KEYWORD>선택데이터</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>전역_메뉴선택</RUN>
+			<COND>메뉴, -면</COND>
+			<EXAMPLE>메뉴를 선택하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>자식폼_회신기안</RUN>
+			<COND>자식폼, 회신기안,-면</COND>
+			<EXAMPLE>자식폼에서 회신기안을 선택하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _문서선택</RUN>
+			<COND>, 항목, -면</COND>
+			<EXAMPLE>...에서 항목을 선택하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _파일열림</RUN>
+			<COND>, 파일, -면</COND>
+			<EXAMPLE>...에서 파일을 선택하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _팝업완료</RUN>
+			<COND>, 데이터, -면</COND>
+			<EXAMPLE>...에서 데이터를 선택하면</EXAMPLE>
+		</Patterns>
+  <Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _일정선택</RUN>
+			<COND>, 일정, -면</COND>
+			<EXAMPLE>...에서 일정을 선택하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>체크ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택값('체크', '전체')</RUN>
+			<COND>,-ㄴ, 전체데이터</COND>
+			<EXAMPLE>[OBJECT]에서 체크한 전체데이터</EXAMPLE>
+			<RESULT>체크데이터</RESULT>
+			<KEYWORD>체크데이터</KEYWORD>			
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택값('체크', '참조')</RUN>
+			<COND>,-ㄴ, 참조데이터</COND>
+			<EXAMPLE>[OBJECT]에서 체크한 참조데이터</EXAMPLE>
+			<RESULT>체크데이터</RESULT>
+			<KEYWORD>체크데이터</KEYWORD>					
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>I + V + O</CHAR>
+			<RUN>I.선택행('체크')</RUN>
+			<COND>,-ㄴ, 행번호</COND>
+			<EXAMPLE>[OBJECT]에서 체크한 행번호</EXAMPLE>
+			<RESULT>체크행</RESULT>
+			<KEYWORD>체크데이터</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>계산ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.연산실행</RUN>
+			<COND>, 연산식</COND>
+			<EXAMPLE>[OBJECT]의 연산식을 계산한다</EXAMPLE>
+			<KEYWORD>연산식계산</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>OP</RUN>
+			<COND>식</COND>
+			<EXAMPLE>식(...)을 계산한다</EXAMPLE>
+			<RESULT>계산결과</RESULT>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>날짜계산(OP)</RUN>
+			<COND>날짜</COND>
+			<EXAMPLE>날짜(...)을 계산한다</EXAMPLE>
+			<HELP_EX>날짜(@구분상수, @기준일, @계산일, @구분표시)을 계산한다</HELP_EX>
+			<RESULT>계산된날짜</RESULT>
+			<KEYWORD>날짜계산</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>시간계산(OP)</RUN>
+			<COND>시간</COND>
+			<EXAMPLE>시간(...)을 계산한다</EXAMPLE>
+			<HELP_EX>시간(@구분상수, @기준시간, @계산시간)을 계산한다</HELP_EX>
+			<RESULT>계산된시간</RESULT>
+			<KEYWORD>시간계산</KEYWORD>			
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>크</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &lt;= T</RUN>
+			<COND>, , -지, 아니</COND>
+			<EXAMPLE>...가 ...보다 크지 않으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>	
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &gt;= T</RUN>
+			<COND>, , -거나, 같</COND>
+			<EXAMPLE>...가 ...보다 크거나 같으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V</CHAR>
+			<RUN>H &gt; T</RUN>
+			<COND>,</COND>
+			<EXAMPLE>...가 ...보다 크면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>작</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &gt;= T</RUN>
+			<COND>, , -지, 아니</COND>
+			<EXAMPLE>...가 ...보다 작지 않으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V + V</CHAR>
+			<RUN>H &lt;= T</RUN>
+			<COND>, , -거나, 같</COND>
+			<EXAMPLE>...가 ...보다 작거나 같으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + T + V</CHAR>
+			<RUN>H &lt; T</RUN>
+			<COND>,</COND>
+			<EXAMPLE>...가 ...보다 작으면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>같</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H = E</RUN>
+			<COND>, -과</COND>
+			<EXAMPLE>...가 ...과 같으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H = E</RUN>
+			<COND>, -와</COND>
+			<EXAMPLE>...가 ...와 같으면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -과, -지, 아니</COND>
+			<EXAMPLE>...가 ...과 같지 않으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -와, -지, 아니</COND>
+			<EXAMPLE>...가 ...와 같지 않으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>, -과, -거나, 작</COND>
+			<EXAMPLE>...가 ...과 같거나 작으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &lt;= E</RUN>
+			<COND>, -와, -거나, 작</COND>
+			<EXAMPLE>...가 ...와 같거나 작으면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>, -과, -거나, 크</COND>
+			<EXAMPLE>...가 ...과 같거나 크면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V + V</CHAR>
+			<RUN>H &gt;= E</RUN>
+			<COND>, -와, -거나, 크</COND>
+			<EXAMPLE>...가 ...와 같거나 크면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>다르</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -과</COND>
+			<EXAMPLE>...가 ...과 다르면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + E + V</CHAR>
+			<RUN>H &lt;&gt; E</RUN>
+			<COND>, -와</COND>
+			<EXAMPLE>...가 ...와 다르면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>아니</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + H + V</CHAR>
+			<RUN>H &lt;&gt; H1</RUN>
+			<COND />
+			<EXAMPLE>...가 ...가 아니고/아니면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>초과ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>H + O + V</CHAR>
+			<RUN>H &gt; O</RUN>
+			<COND />
+			<EXAMPLE>...가 ...를 초과하면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>만족ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>COND</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O</RUN>
+			<COND>조건, </COND>
+			<EXAMPLE>조건(...)를 만족하면</EXAMPLE>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>반올림ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O.IP0.소수점(VP, '반올림')</RUN>
+			<COND />
+			<EXAMPLE>[OBJECT]을 반올림(...)하여</EXAMPLE>
+			<HELP_EX>[OBJECT]을 반올림(@반올림할자리수)하여</HELP_EX>
+			<RESULT>반올림된값</RESULT>
+			<KEYWORD>반올림</KEYWORD>			
+		</Patterns>
+	</Verb>
+	<!--
+	<Verb>
+		<VERBID>절단ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.IP0.문자열(OP)</RUN>
+			<COND>, 일부</COND>
+			<EXAMPLE>[OBJECT]의 일부(..., ...)를 절단하여</EXAMPLE>
+			<RESULT>일부문자열</RESULT>
+		</Patterns>
+	</Verb>
+	-->
+	<Verb>
+		<VERBID>출력ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>보고서출력(BP, OP)</RUN>
+			<COND>경로, 보고서</COND>
+			<EXAMPLE>경로(...)의 보고서( ..., '미리보기')를 출력한다.</EXAMPLE>
+			<HELP_EX>경로(...)의 보고서(@출력할내용, '미리보기')를 출력한다.</HELP_EX>
+			<SHOW>FALSE</SHOW>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_출력</RUN>
+			<COND>폼, -면</COND>
+			<EXAMPLE>폼을 출력하면</EXAMPLE>
+		</Patterns>
+   <Patterns>
+      <ID>3</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>O + W + V</CHAR>
+      <RUN>음성출력(O)</RUN>
+      <COND>, 음성</COND>
+      <EXAMPLE>...를 음성으로 출력한다.</EXAMPLE>
+      <KEYWORD>음성출력</KEYWORD>
+    </Patterns>
+  
+  	<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>디지털핀출력(N, O)</RUN>
+			<COND>디지털핀</COND>
+			<EXAMPLE>디지털핀의 ...에 ...을 출력한다.</EXAMPLE>
+			<KEYWORD>디지털핀출력</KEYWORD>
+		</Patterns>
+    <Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>아날로그핀출력(N, O)</RUN>
+			<COND>아날로그핀</COND>
+			<EXAMPLE>아날로그핀의 ...에 ...을 출력한다.</EXAMPLE>
+			<KEYWORD>아날로그핀출력</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>B + N + O + V</CHAR>
+      <RUN>서보모터출력(N, O)</RUN>
+      <COND>서보모터</COND>
+      <EXAMPLE>서보모터의 ...에 ...을 출력한다.</EXAMPLE>
+      <KEYWORD>서보모터출력</KEYWORD>
+    </Patterns>
+
+  </Verb>
+	<Verb>
+		<VERBID>누르</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _누름</RUN>
+			<COND>, -면</COND>
+			<EXAMPLE>...을 누르면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + E + V</CHAR>
+			<RUN>O _두번누름</RUN>
+			<COND>,두번, -면</COND>
+			<EXAMPLE>...을 두번 누르면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + V</CHAR>
+			<RUN>I _체크누름</RUN>
+			<COND>,체크박스, -면</COND>
+			<EXAMPLE>...에서 체크박스를 누르면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>4</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + E + V</CHAR>
+      <RUN>O _길게누름</RUN>
+      <COND>,길게, -면</COND>
+      <EXAMPLE>...을 길게 누르면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>5</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _마커누름</RUN>
+      <COND>,마커, -면</COND>
+      <EXAMPLE>...의 마커를 누르면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>6</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _아이콘누름</RUN>
+      <COND>,아이콘, -면</COND>
+      <EXAMPLE>...의 아이콘을 누르면</EXAMPLE>
+    </Patterns>
+        
+	</Verb>
+	<Verb>
+		<VERBID>접속ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + V</CHAR>
+			<RUN>전역_서버접속</RUN>
+			<COND>서버, -면</COND>
+			<EXAMPLE>서버에 접속하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>교체ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>전역_메뉴교체</RUN>
+			<COND>메뉴, -면</COND>
+			<EXAMPLE>메뉴를 교체하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>열</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_열림</RUN>
+			<COND>폼, -면</COND>
+			<EXAMPLE>폼을 열면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>닫</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_닫힘</RUN>
+			<COND>폼, -으면</COND>
+			<EXAMPLE>폼을 닫으면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>자식폼_닫힘</RUN>
+			<COND>자식폼, -으면</COND>
+			<EXAMPLE>자식폼을 닫으면</EXAMPLE>
+		</Patterns>
+	</Verb>
+  <Verb>
+    <VERBID>활성화ㅎ</VERBID>
+    <Patterns>
+      <ID>1</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>폼_활성화</RUN>
+      <COND>폼, -면</COND>
+      <EXAMPLE>폼을 활성화하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+  <Verb>
+		<VERBID>터치ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_터치</RUN>
+			<COND>폼, -면</COND>
+			<EXAMPLE>폼을 터치하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+  <Verb>
+		<VERBID>단말회전ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_단말회전</RUN>
+			<COND>폼, -면</COND>
+			<EXAMPLE>폼을 단말회전하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+  <Verb>
+		<VERBID>회전ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_회전</RUN>
+			<COND>폼, -면</COND>
+			<EXAMPLE>폼을 회전하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>호출ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>X + I + V</CHAR>
+			<RUN>폼_호출확인</RUN>
+			<COND>다르, 폼, -면</COND>
+			<EXAMPLE>다른 폼에서 호출하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_호출</RUN>
+			<COND>문서모델, -면</COND>
+			<EXAMPLE>문서모델을 호출하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>입력ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + W + V</CHAR>
+			<RUN>폼_키입력</RUN>
+			<COND>폼, 키보드, -면</COND>
+			<EXAMPLE>폼에 키보드로 입력하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + W + V</CHAR>
+			<RUN>N _키입력</RUN>
+			<COND>, 키보드, -면</COND>
+			<EXAMPLE>...에 키보드로 입력하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _키누름</RUN>
+			<COND>, 기능키, -면</COND>
+			<EXAMPLE>...에 기능키를 입력하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + W + O + V</CHAR>
+			<RUN>N _팝업동작</RUN>
+			<COND>, 팝업동작, 데이터, -면</COND>
+			<EXAMPLE>...에 팝업동작으로 데이터를 입력하면</EXAMPLE>
+		</Patterns>
+  
+    <Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>디지털핀읽기(O)</RUN>
+			<COND>디지털핀</COND>
+			<EXAMPLE>디지털핀의 ...번을 입력하여</EXAMPLE>
+			<KEYWORD>디지털핀읽기</KEYWORD>
+		</Patterns>
+    <Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>아날로그핀읽기(O)</RUN>
+			<COND>아날로그핀</COND>
+			<EXAMPLE>아날로그핀의 ...번을 입력하여</EXAMPLE>
+			<KEYWORD>아날로그핀읽기</KEYWORD>
+		</Patterns>
+    <Patterns>
+      <ID>7</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _음성명령입력</RUN>
+      <COND>, 명령어, -면</COND>
+      <EXAMPLE>...의 명령어를 입력하면</EXAMPLE>
+    </Patterns>
+  
+	</Verb>
+	<Verb>
+		<VERBID>완료ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>B _검색완료</RUN>
+			<COND>, 검색, ,후</COND>
+			<EXAMPLE>...의 검색을 완료한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>폼_검색완료</RUN>
+			<COND>폼, 검색, ,후</COND>
+			<EXAMPLE>폼의 검색을 완료한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>3</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>폼_저장완료전</RUN>
+			<COND>폼, 저장, -기, 전</COND>
+			<EXAMPLE>폼의 저장을 완료하기 전에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>4</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>폼_저장완료후</RUN>
+			<COND>폼, 저장, , 후</COND>
+			<EXAMPLE>폼의 저장을 완료한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>5</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>트랜잭션메시지(1)</RUN>
+			<COND>DB처리</COND>
+			<EXAMPLE>DB처리를 완료한다.</EXAMPLE>
+			<KEYWORD>트랜잭션메시지</KEYWORD>
+		</Patterns>
+		<Patterns>
+			<ID>6</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼_문서출력완료</RUN>
+			<COND>문서모델, 출력, -면</COND>
+			<EXAMPLE>문서모델의 출력을 완료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>7</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>자식폼_인쇄출력</RUN>
+			<COND>자식폼, 문서모델, 출력, -면</COND>
+			<EXAMPLE>자식폼에서 문서모델의 출력을 완료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>8</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + B + O + V</CHAR>
+			<RUN>B _저장결과</RUN>
+			<COND>문서모델, , 동작, -면</COND>
+			<EXAMPLE>문서모델에서 ...의 동작을 완료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>9</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>N + O + V</CHAR>
+			<RUN>N _입력마침</RUN>
+			<COND>, 입력, -면</COND>
+			<EXAMPLE>...에 입력을 완료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>10</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>폼_결재완료</RUN>
+			<COND>폼, 결재, ,후</COND>
+			<EXAMPLE>폼의 결재를 완료한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>11</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V + N</CHAR>
+			<RUN>폼_접수완료</RUN>
+			<COND>폼, 접수, ,후</COND>
+			<EXAMPLE>폼의 접수를 완료한 후에</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>12</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼_입력완료</RUN>
+			<COND>폼, 입력, -면</COND>
+			<EXAMPLE>폼의 입력을 완료하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+		  <ID>13</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+		  <CHAR>B + O + V</CHAR>
+		  <RUN>외부앱_입력완료</RUN>
+		  <COND>외부앱, 입력, -면</COND>
+		  <EXAMPLE>외부앱의 입력을 완료하면</EXAMPLE>
+		</Patterns>    
+		<Patterns>
+			<ID>14</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _문제풀이완료</RUN>
+			<COND>, 문제풀이, -면</COND>
+			<EXAMPLE>...의 문제풀이를 완료하면</EXAMPLE>
+	 </Patterns>
+   <Patterns>
+      <ID>15</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _로드완료</RUN>
+      <COND>, 페이징, -면</COND>
+      <EXAMPLE>...의 페이징을 완료하면</EXAMPLE>
+    </Patterns>
+ 		<Patterns>
+			<ID>16</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _음성인식완료</RUN>
+			<COND>, 음성인식, -면</COND>
+			<EXAMPLE>...의 음성인식을 완료하면</EXAMPLE>
+		</Patterns>
+  	<Patterns>
+			<ID>17</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _번역하기완료</RUN>
+			<COND>, 번역하기, -면</COND>
+			<EXAMPLE>...의 번역하기를 완료하면</EXAMPLE>
+		</Patterns> 
+   	<Patterns>
+			<ID>18</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _음성합성완료</RUN>
+			<COND>, 음성합성, -면</COND>
+			<EXAMPLE>...의 음성합성을 완료하면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+			<ID>19</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _수신완료</RUN>
+			<COND>, 수신, -면</COND>
+			<EXAMPLE>...의 수신을 완료하면</EXAMPLE>
+		</Patterns> 
+    <Patterns>
+			<ID>20</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _송신완료</RUN>
+			<COND>, 송신, -면</COND>
+			<EXAMPLE>...의 송신을 완료하면</EXAMPLE>
+		</Patterns>  
+    <Patterns>
+			<ID>21</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _연결완료</RUN>
+			<COND>, 연결, -면</COND>
+			<EXAMPLE>...의 연결을 완료하면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>22</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _영상인식완료</RUN>
+      <COND>, 영상인식, -면</COND>
+      <EXAMPLE>...의 영상인식을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>23</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _재생완료</RUN>
+      <COND>, 재생, -면</COND>
+      <EXAMPLE>...의 재생을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>24</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_애니메이션완료</RUN>
+      <COND>폼, 애니메이션, -면</COND>
+      <EXAMPLE>폼의 애니메이션을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>25</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _애니메이션완료</RUN>
+      <COND>, 애니메이션, -면</COND>
+      <EXAMPLE>...의 애니메이션을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>26</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _준비완료</RUN>
+      <COND>, 준비, -면</COND>
+      <EXAMPLE>...의 준비를 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>27</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _채팅방존재확인</RUN>
+      <COND>, 채팅방존재확인, -면</COND>
+      <EXAMPLE>...의 채팅방존재확인을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>28</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _확대축소완료</RUN>
+      <COND>, 확대축소, -면</COND>
+      <EXAMPLE>...의 확대축소를 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>29</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_준비완료</RUN>
+      <COND>폼, 준비, -면</COND>
+      <EXAMPLE>폼의 준비를 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>30</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V </CHAR>
+      <RUN>폼_권한요청완료</RUN>
+      <COND>폼, 권한요청, -면</COND>
+      <EXAMPLE>폼의 권한요청을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>31</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>B _유효성검사완료</RUN>
+      <COND>, 유효성검사, -면</COND>
+      <EXAMPLE>...의 유효성검사를 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>32</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스_블루투스송신</RUN>
+      <COND>, 블루투스송신, -면</COND>
+      <EXAMPLE>서비스의 블루투스송신을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>33</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스_블루투스수신</RUN>
+      <COND>, 블루투스수신, -면</COND>
+      <EXAMPLE>서비스의 블루투스수신을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>34</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>폼_문제풀이완료</RUN>
+      <COND>아톰, 문제풀이, -면</COND>
+      <EXAMPLE>아톰의 문제풀이를 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>35</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V</CHAR>
+      <RUN>서비스_수신완료</RUN>
+      <COND>, 웹서비스수신, -면</COND>
+      <EXAMPLE>서비스의 웹서비스수신을 완료하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>36</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + O + V + N</CHAR>
+      <RUN>폼_외부기능완료</RUN>
+      <COND>폼, 외부기능, ,후</COND>
+      <EXAMPLE>폼의 외부기능을 완료한 후에</EXAMPLE>
+    </Patterns>
+	<Patterns>
+		<ID>37</ID>
+		<GR_TYPE>EVENT</GR_TYPE>
+		<CHAR>B + O + V</CHAR>
+		<RUN>서비스_소켓수신완료</RUN>
+		<COND>, 소켓수신, -면</COND>
+		<EXAMPLE>서비스의 소켓수신을 완료하면</EXAMPLE>
+	</Patterns>
+
+  </Verb>
+	<Verb>
+		<VERBID>전환ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B _탭뷰전환</RUN>
+			<COND>, 탭뷰,-면</COND>
+			<EXAMPLE>...의 탭뷰를 전환하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼.F9전환</RUN>
+			<COND>선택표시</COND>
+			<EXAMPLE>선택표시를 전환한다.</EXAMPLE>
+			<KEYWORD>선택표시전환</KEYWORD>			
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>감추</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>B.항목변경선택(OP, '숨기기')</RUN>
+			<COND>, 항목</COND>
+			<EXAMPLE>[OBJECT]의 항목(...)를 감춘다</EXAMPLE>
+			<KEYWORD>검색창항목표시변경</KEYWORD>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>처리ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>폼_문서대장</RUN>
+			<COND>결재</COND>
+			<EXAMPLE>결재를 처리하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>저장ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + W + V</CHAR>
+			<RUN>폼_문서복사완료</RUN>
+			<COND>문서모델, 파일, -면</COND>
+			<EXAMPLE>문서모델을 파일로 저장하면</EXAMPLE>
+		</Patterns>
+		<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + O + W + V</CHAR>
+			<RUN>자식폼_파일저장</RUN>
+			<COND>자식폼, 문서모델, 파일, -면</COND>
+			<EXAMPLE>자식폼에서 문서모델을 파일로 저장하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>증가ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>I + H + W + V</CHAR>
+			<RUN>I _자동증가</RUN>
+			<COND>, 데이터, 자동, -면</COND>
+			<EXAMPLE>...에서 데이터가 자동으로 증가하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+	<Verb>
+		<VERBID>갱신ㄷ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>H + V</CHAR>
+			<RUN>H _위치갱신</RUN>
+			<COND>, -면</COND>
+			<EXAMPLE>...가 갱신되면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>B + H + V</CHAR>
+      <RUN>서비스_위치갱신</RUN>
+      <COND>서비스, 위치정보, -면</COND>
+      <EXAMPLE>서비스의 위치정보가 갱신되면</EXAMPLE>
+    </Patterns>
+	</Verb>
+  <Verb>
+    <VERBID>등록ㅎ</VERBID>
+    <Patterns>
+      <ID>1</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>N + O + V</CHAR>
+      <RUN>음성명령어(O)</RUN>
+      <COND>음성명령어,</COND>
+      <EXAMPLE>음성명령어에 ...을 등록한다.</EXAMPLE>
+    </Patterns>
+    <Patterns>
+      <ID>2</ID>
+      <GR_TYPE>EXPR</GR_TYPE>
+      <CHAR>N + O + V</CHAR>
+      <RUN>외부앱액션명(O)</RUN>
+      <COND>외부앱액션명,</COND>
+      <EXAMPLE>외부앱액션명에 ...을 등록한다.</EXAMPLE>
+    </Patterns>
+  </Verb>
+
+  <Verb>
+    <VERBID>토글ㅎ</VERBID>
+    <Patterns>
+      <ID>3</ID>
+      <GR_TYPE>ASSIGN</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>O = -1</RUN>
+      <COND />
+      <EXAMPLE>...을 토글한다.</EXAMPLE>
+      <KEYWORD>속성설정토글</KEYWORD>
+    </Patterns>
+  </Verb>
+
+  <Verb>
+    <VERBID>끌어놓기ㅎ</VERBID>
+    <Patterns>
+      <ID>1</ID>
+      <GR_TYPE>EVENT</GR_TYPE>
+      <CHAR>O + V</CHAR>
+      <RUN>폼_아톰끌어놓기</RUN>
+      <COND>아톰, -면</COND>
+      <EXAMPLE>아톰을 끌어놓기하면</EXAMPLE>
+    </Patterns>
+    <Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _끌어놓기</RUN>
+			<COND>,-면</COND>
+			<EXAMPLE>...을 끌어놓기하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+  
+  <Verb>
+    <VERBID>확장ㅎ</VERBID>
+    <Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _확장</RUN>
+			<COND>,-면</COND>
+			<EXAMPLE>...를 확장하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+  <Verb>
+    <VERBID>축소ㅎ</VERBID>
+    <Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>O + V</CHAR>
+			<RUN>O _축소</RUN>
+			<COND>,-면</COND>
+			<EXAMPLE>...를 축소하면</EXAMPLE>
+    </Patterns>
+  </Verb>
+  
+ 	<Verb>
+		<VERBID>감지ㅎ</VERBID>
+		<Patterns>
+			<ID>1</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>폼_걸음감지</RUN>
+			<COND>폼, 걸음, -면</COND>
+			<EXAMPLE>폼의 걸음을 감지하면</EXAMPLE>
+		</Patterns>
+    <Patterns>
+			<ID>2</ID>
+		  <GR_TYPE>EVENT</GR_TYPE>
+			<CHAR>B + O + V</CHAR>
+			<RUN>서비스_걸음감지</RUN>
+			<COND>서비스, 걸음, -면</COND>
+			<EXAMPLE>서비스의 걸음을 감지하면</EXAMPLE>
+		</Patterns>
+	</Verb>
+      
+  <Verb>
+    <VERBID>송신ㅎ</VERBID> 
+   	<Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>디지털핀출력(N, O)</RUN>
+			<COND>디지털핀</COND>
+			<EXAMPLE>디지털핀의 ...에 ...을 송신한다.</EXAMPLE>
+			<KEYWORD>디지털핀출력</KEYWORD>
+		</Patterns>
+   	<Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + N + O + V</CHAR>
+			<RUN>아날로그핀출력(N, O)</RUN>
+			<COND>아날로그핀</COND>
+			<EXAMPLE>아날로그핀의 ...에 ...을 송신한다.</EXAMPLE>
+			<KEYWORD>아날로그핀출력</KEYWORD>
+		</Patterns> 
+  </Verb>       
+  <Verb>
+    <VERBID>수신ㅎ</VERBID>
+    <Patterns>
+			<ID>1</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>디지털핀읽기(O, W)</RUN>
+			<COND>디지털핀</COND>
+			<EXAMPLE>디지털핀 ...을 ...으로 수신한다.</EXAMPLE>
+			<KEYWORD>디지털핀읽기</KEYWORD>
+		</Patterns> 
+    <Patterns>
+			<ID>2</ID>
+			<GR_TYPE>EXPR</GR_TYPE>
+			<CHAR>B + O + W + V</CHAR>
+			<RUN>아날로그핀읽기(O, W)</RUN>
+			<COND>아날로그핀</COND>
+			<EXAMPLE>아날로그핀 ...을 ...으로 수신한다.</EXAMPLE>
+			<KEYWORD>아날로그핀읽기</KEYWORD>
+		</Patterns>  
+  </Verb>
+</VerbDic>
